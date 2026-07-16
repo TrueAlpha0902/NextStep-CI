@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#fbfaf6">
+  <meta name="app-version" content="3.1.0">
+  <meta name="description" content="長頸鹿主題雙人派對遊戲：反應、疊塔、彈珠、射箭、抽鬼牌與迷宮競速。">
+  <title>Reaction Duel｜長頸鹿派對</title>
+  <link rel="stylesheet" href="/styles.css?v=3.1.0">
+</head>
+<body>
+  <div id="boot" role="status" aria-live="polite">
+    <div class="boot-card">
+      <div class="boot-mark" aria-hidden="true">♟</div>
+      <p class="kicker">GIRAFFE PARTY CLUB</p>
+      <h1>Reaction Duel</h1>
+      <p id="bootText">正在整理長頸鹿派對場地…</p>
+      <div class="load-track"><i id="loadBar"></i></div>
+      <div class="load-meta"><span id="loadStep">載入角色</span><b id="loadPct">12%</b></div>
+      <div id="bootError" class="boot-error hidden"></div>
+      <button id="bootRetry" class="btn primary hidden" type="button">重新載入</button>
+    </div>
+  </div>
+  <main id="app" aria-live="polite"></main>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/art.js?v=3.1.0"></script>
+  <script src="/app.js?v=3.1.0" defer></script>
+</body>
+</html>
