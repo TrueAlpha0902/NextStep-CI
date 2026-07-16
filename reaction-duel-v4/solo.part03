@@ -1,0 +1,107 @@
+    return soloShell(gameHeader() + '<section class="card stage oldmaid-stage"><div class="card-table"><div class="hand-label">電腦手牌・' + m.cpu.length + ' 張</div><div class="card-hand opponent">' + backs + '</div><div class="turn-message"><span class="status-pill ready">' + (m.turn === 'player' ? '輪到你抽牌' : '電腦正在抽牌') + '</span><h2>' + (m.turn === 'player' ? '選擇一張牌背' : '稍等一下') + '</h2><p>相同數字會自動成對消除。</p></div><div class="hand-label">你的手牌・' + m.player.length + ' 張</div><div class="card-hand own">' + own + '</div></div></section>');
+  }
+
+  function mazeView() {
+    var m = solo.current;
+    function pos(index) { return 'left:' + ((index % m.board.width) / m.board.width * 100 + .6) + '%;top:' + (Math.floor(index / m.board.width) / m.board.height * 100 + .6) + '%'; }
+    return soloShell(gameHeader() + '<section class="card stage maze-stage"><div class="maze-board" id="soloMazeBoard"><canvas id="soloMazeCanvas" width="720" height="720"></canvas><i class="maze-token player" style="' + pos(m.playerPos) + '">' + ART.giraffe(solo.player.character, 'run') + '</i><i class="maze-token cpu" style="' + pos(m.cpuPos) + '">' + ART.giraffe(solo.cpu.character, 'run') + '</i></div><div class="maze-status"><span>你：' + m.playerMoves + ' 步</span><b>先到金色終點</b><span>電腦：' + m.cpuMoves + ' 步</span></div><div class="directions"><button class="up" data-solo-move="up">↑</button><button class="left" data-solo-move="left">←</button><button class="down" data-solo-move="down">↓</button><button class="right" data-solo-move="right">→</button></div></section>');
+  }
+
+  function roundResultView() {
+    var r = solo.result;
+    return soloShell('<section class="card result-card">' + ART.giraffe(r.winner === 'cpu' ? solo.cpu.character : solo.player.character, r.winner === 'tie' ? 'idle' : 'win') + '<p class="kicker">ROUND RESULT</p><h1>' + r.title + '</h1><p>' + r.text + '</p><div class="result-stats"><div><span>你</span><b>' + r.playerStat + '</b></div><div><span>電腦</span><b>' + r.cpuStat + '</b></div></div><div class="big-score">' + solo.scores.player + ' <i>:</i> ' + solo.scores.cpu + '</div><button type="button" class="btn primary wide" id="soloNext">' + (solo.round >= solo.maxRounds ? '查看最終結果' : '下一回合') + '</button></section>');
+  }
+
+  function matchView() {
+    var s = solo.scores;
+    var winner = s.player === s.cpu ? 'tie' : (s.player > s.cpu ? 'player' : 'cpu');
+    var title = winner === 'tie' ? '平手' : (winner === 'player' ? '你贏了！' : '電腦獲勝');
+    return soloShell('<section class="card result-card final">' + ART.giraffe(winner === 'cpu' ? solo.cpu.character : solo.player.character, winner === 'tie' ? 'idle' : 'win') + '<p class="kicker">PRACTICE COMPLETE</p><h1>' + title + '</h1><p>單人測試已完成。可以調整電腦強度後再次測試。</p><div class="big-score">' + s.player + ' <i>:</i> ' + s.cpu + '</div><button type="button" class="btn primary wide" id="soloAgain">再玩一次</button><button type="button" class="btn secondary wide" id="soloHome">返回首頁</button></section>');
+  }
+
+  function renderSolo() {
+    clearInterval(solo && solo.interval);
+    cancelAnimationFrame(animationFrame);
+    if (!solo) return;
+    if (solo.phase === 'intro') app.innerHTML = introView();
+    else if (solo.phase === 'countdown') app.innerHTML = countdownView();
+    else if (solo.phase === 'playing') {
+      if (isReaction(solo.gameId)) app.innerHTML = reactionGameView();
+      else if (solo.gameId === 'archery') app.innerHTML = pointBoardView('archery');
+      else if (solo.gameId === 'marbles') app.innerHTML = pointBoardView('marbles');
+      else if (solo.gameId === 'tower') app.innerHTML = towerView();
+      else if (solo.gameId === 'oldmaid') app.innerHTML = oldMaidView();
+      else app.innerHTML = mazeView();
+    } else if (solo.phase === 'round_result') app.innerHTML = roundResultView();
+    else app.innerHTML = matchView();
+    bindSolo();
+  }
+
+  function exitSolo() { clearTimers(); solo = null; window.location.reload(); }
+
+  function beginCountdown() {
+    clearTimers();
+    solo.phase = 'countdown';
+    solo.countEnd = Date.now() + 3200;
+    renderSolo();
+    solo.interval = setInterval(function () {
+      var el = document.getElementById('soloCount');
+      if (!el) return;
+      var n = Math.max(0, Math.ceil((solo.countEnd - Date.now()) / 1000));
+      el.textContent = n || 'GO';
+    }, 70);
+    addTimer(setTimeout(beginGame, 3300));
+  }
+
+  function beginGame() {
+    clearTimers();
+    solo.phase = 'playing';
+    if (isReaction(solo.gameId)) beginReaction();
+    else if (solo.gameId === 'archery') solo.current = { aim:{x:0,y:0}, windX:rand(-.1,.1), windY:rand(-.08,.08) };
+    else if (solo.gameId === 'marbles') solo.current = { aim:{x:0,y:-.1}, power:.72 };
+    else if (solo.gameId === 'tower') solo.current = { blocks:[{x:0,width:.88}], turn:Math.random() < .5 ? 'player' : 'cpu', movingX:0 };
+    else if (solo.gameId === 'oldmaid') solo.current = createOldMaid();
+    else solo.current = createMazeGame();
+    renderSolo();
+    if (solo.gameId === 'tower' && solo.current.turn === 'cpu') scheduleCpuTower();
+    if (solo.gameId === 'oldmaid' && solo.current.turn === 'cpu') scheduleCpuMaid();
+    if (solo.gameId === 'maze') startCpuMaze();
+  }
+
+  function beginReaction() {
+    var cfg = config();
+    var cpuMs = Math.round(rand(cfg.reactionMin, cfg.reactionMax));
+    solo.current = { prompt:reactionPrompt(solo.gameId), live:false, sent:false, early:false, shownAt:0, playerMs:null, cpuMs:cpuMs, resolved:false };
+    renderSolo();
+    addTimer(setTimeout(function () {
+      if (!solo || solo.phase !== 'playing' || solo.current.resolved) return;
+      solo.current.live = true;
+      renderSolo();
+      requestAnimationFrame(function () {
+        solo.current.shownAt = performance.now();
+        vibrate(12);
+        addTimer(setTimeout(function () { if (solo && !solo.current.sent && !solo.current.resolved) finishReaction(null); }, cpuMs));
+      });
+    }, Math.round(rand(900, 2200))));
+  }
+
+  function finishReaction(playerMs) {
+    var c = solo.current;
+    if (c.resolved) return;
+    c.resolved = true;
+    var winner, title, text;
+    if (c.early) { winner='cpu'; title='太早按了'; text='訊號出現前就碰觸，電腦取得本回合。'; }
+    else if (playerMs == null) { winner='cpu'; title='電腦先完成'; text='電腦以 ' + c.cpuMs + ' ms 完成反應。'; }
+    else if (Math.abs(playerMs - c.cpuMs) <= 30) { winner='tie'; title='幾乎同時'; text='雙方差距在 30 ms 以內。'; }
+    else if (playerMs < c.cpuMs) { winner='player'; title='你更快！'; text='你快了 ' + (c.cpuMs - playerMs) + ' ms。'; }
+    else { winner='cpu'; title='電腦更快'; text='電腦快了 ' + (playerMs - c.cpuMs) + ' ms。'; }
+    finishRound(winner, title, text, playerMs == null ? '未按下' : (playerMs < 0 ? '提早按' : playerMs + ' ms'), c.cpuMs + ' ms', 1, 1);
+  }
+
+  function archeryPoints(x, y, wx, wy) {
+    var r = Math.sqrt(Math.pow(x + wx, 2) + Math.pow(y + wy, 2));
+    return r <= .12 ? 10 : r <= .25 ? 8 : r <= .42 ? 6 : r <= .62 ? 4 : r <= .85 ? 2 : 0;
+  }
+
+  function shootArchery() {
+    var c = solo.current, cfg = config();
