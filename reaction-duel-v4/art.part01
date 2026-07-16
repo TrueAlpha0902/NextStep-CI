@@ -1,0 +1,54 @@
+(function () {
+  'use strict';
+
+  var CHARACTERS = [
+    { id: 1, name: '阿橘', role: '冒險家', body: '#F1D7A6', spot: '#B77A46', accent: '#C97F62', accessory: 'scarf', tagline: '勇敢、直接，喜歡第一個出發。' },
+    { id: 2, name: '米拉', role: '設計師', body: '#F4DCB8', spot: '#B87961', accent: '#C9938C', accessory: 'beret', tagline: '觀察細節，總能找到最好看的解法。' },
+    { id: 3, name: '洛奇', role: '隊長', body: '#EFCF91', spot: '#A86B3D', accent: '#839173', accessory: 'cap', tagline: '沉著可靠，關鍵時刻最穩。' },
+    { id: 4, name: '星仔', role: '博士', body: '#F3E2C2', spot: '#9C7C58', accent: '#78949D', accessory: 'glasses', tagline: '喜歡計算角度、速度與每一毫秒。' },
+    { id: 5, name: '可可', role: '收藏家', body: '#EACB8F', spot: '#875B3B', accent: '#9585A2', accessory: 'flower', tagline: '溫柔又機靈，最擅長記住每一張牌。' }
+  ];
+
+  var GAMES = {
+    color: { id:'color', title:'顏色快拍', category:'反應競技', rounds:'5 回合', icon:'palette', summary:'記住目標顏色，訊號真正亮起後立刻按下。', rules:['先記住指定顏色。','倒數結束後仍要等待隨機訊號。','手指碰到反應區的瞬間完成計時；提早按會扣分。'] },
+    number: { id:'number', title:'數字追擊', category:'反應競技', rounds:'5 回合', icon:'number', summary:'鎖定目標數字，忽略干擾數字，正確數字出現時立刻按下。', rules:['先確認本回合的目標數字。','畫面一開始會顯示干擾數字。','看到正確數字後碰觸反應區。'] },
+    shape: { id:'shape', title:'形狀反射', category:'反應競技', rounds:'5 回合', icon:'shape', summary:'辨認指定形狀，等到相同形狀出現再出手。', rules:['記住提示形狀。','不要被相似圖形騙到。','正確形狀出現時立刻碰觸。'] },
+    shadow: { id:'shadow', title:'影子配對', category:'反應競技', rounds:'5 回合', icon:'shadow', summary:'在輪廓切換時，找出和提示完全相同的影子。', rules:['先看清楚目標輪廓。','等待影子切換成正確答案。','正確輪廓出現時立刻按下。'] },
+    tower: { id:'tower', title:'疊高塔', category:'技巧競技', rounds:'一局決勝', icon:'tower', summary:'輪流放下移動積木，超出的部分會被切掉，讓高塔越疊越窄。', rules:['輪到你時觀察左右移動的積木。','碰觸「放下」後，超出上一層的部分會被切除。','完成 12 層，或讓對手完全錯開倒塔，即可獲勝。'] },
+    marbles: { id:'marbles', title:'彈珠撞擊', category:'技巧競技', rounds:'5 回合', icon:'marble', summary:'設定瞄準點與力道，兩顆彈珠可能碰撞；最後越靠近中心分數越高。', rules:['點擊圓盤設定瞄準方向。','調整力道後發射。','兩顆彈珠太接近會互相推擠，越靠近中心得分越高。'] },
+    archery: { id:'archery', title:'射箭對決', category:'技巧競技', rounds:'5 回合', icon:'archery', summary:'觀察風向，拖曳準星後放箭；兩位玩家都完成後同時公開分數。', rules:['先查看風向與強度。','拖曳靶面設定準星位置。','風會讓落點偏移；越接近靶心得分越高。'] },
+    oldmaid: { id:'oldmaid', title:'抽鬼牌', category:'卡牌遊戲', rounds:'一局決勝', icon:'cards', summary:'輪流抽對手手牌，相同數字會自動成對消除；最後留下鬼牌的人落敗。', rules:['你只能看到自己的手牌。','輪到你時，從對手的牌背中抽一張。','相同數字自動消除；率先清空手牌即可獲勝。'] },
+    maze: { id:'maze', title:'迷宮競速', category:'競速遊戲', rounds:'一局決勝', icon:'maze', summary:'兩位玩家使用完全相同的迷宮，率先抵達右下角終點。', rules:['雙方從左上角同時出發。','使用方向鍵、鍵盤方向鍵或滑動移動。','率先到達右下角金色終點者獲勝。'] }
+  };
+
+  function uid() { return 'g' + Math.random().toString(36).slice(2, 9); }
+
+  function accessory(c) {
+    if (c.accessory === 'scarf') return '<path d="M72 132q23 14 52 1l-4 18-22-5-20 8Z" fill="'+c.accent+'" stroke="#5B4A3C" stroke-width="2.6"/><path d="M114 146q15 8 9 25l-13-15Z" fill="'+c.accent+'" stroke="#5B4A3C" stroke-width="2.6"/>';
+    if (c.accessory === 'beret') return '<path d="M85 34q23-19 48-1l-5 11q-22-8-42 4Z" fill="'+c.accent+'" stroke="#5B4A3C" stroke-width="2.6"/><path d="M109 27q0-8 7-10" fill="none" stroke="#5B4A3C" stroke-width="2.6"/>';
+    if (c.accessory === 'cap') return '<path d="M83 35q23-19 50-2l-4 11q-24-6-44 5Z" fill="'+c.accent+'" stroke="#5B4A3C" stroke-width="2.6"/><path d="M128 40q17 1 22 7-14 4-25 1Z" fill="'+c.accent+'" stroke="#5B4A3C" stroke-width="2.6"/>';
+    if (c.accessory === 'glasses') return '<g fill="none" stroke="'+c.accent+'" stroke-width="3.4"><circle cx="96" cy="79" r="11"/><circle cx="126" cy="79" r="11"/><path d="M107 79h8M84 78l-7-2M138 78l8-2"/></g><path d="M72 135q24 12 52 0l-4 18-22-5-20 8Z" fill="#FAFBF7" stroke="#5B4A3C" stroke-width="2.6"/>';
+    if (c.accessory === 'flower') return '<g transform="translate(144 45)" stroke="#5B4A3C" stroke-width="1.8"><circle r="6" fill="#F1D4A2"/><circle cy="-9" r="6" fill="'+c.accent+'"/><circle cx="8" cy="-3" r="6" fill="'+c.accent+'"/><circle cx="5" cy="7" r="6" fill="'+c.accent+'"/><circle cx="-5" cy="7" r="6" fill="'+c.accent+'"/><circle cx="-8" cy="-3" r="6" fill="'+c.accent+'"/></g>';
+    return '';
+  }
+
+  function giraffe(id, pose, className, label) {
+    var c = CHARACTERS[(Number(id) || 1) - 1] || CHARACTERS[0];
+    var g = uid();
+    var cls = className ? ' class="' + className + '"' : '';
+    var title = label || (c.name + '，' + c.role);
+    var tilt = pose === 'run' ? -2 : pose === 'think' ? 2 : 0;
+    var eye = pose === 'win'
+      ? '<path d="M89 79q6-6 12 0M119 79q6-6 12 0" fill="none" stroke="#3D342D" stroke-width="3.4"/>'
+      : '<ellipse cx="96" cy="79" rx="4.2" ry="5" fill="#3D342D"/><ellipse cx="126" cy="79" rx="4.2" ry="5" fill="#3D342D"/><circle cx="94.7" cy="77.4" r="1.1" fill="#fff"/><circle cx="124.7" cy="77.4" r="1.1" fill="#fff"/>';
+    var mouth = pose === 'think' ? '<path d="M104 108q8-4 16 0" fill="none" stroke="#5B4A3C" stroke-width="3"/>' : '<path d="M102 107q10 11 22 0" fill="none" stroke="#5B4A3C" stroke-width="3"/>';
+    return '<svg'+cls+' viewBox="0 0 190 230" role="img" aria-label="'+title+'"><defs><linearGradient id="'+g+'" x1="0" y1="0" x2="1" y2="1"><stop stop-color="'+c.body+'"/><stop offset="1" stop-color="#FFF1D2"/></linearGradient><filter id="'+g+'s" x="-25%" y="-25%" width="150%" height="165%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#5A4938" flood-opacity=".12"/></filter></defs><g transform="rotate('+tilt+' 104 122)" filter="url(#'+g+'s)"><path d="M66 219C61 203 62 190 66 174L72 148C75 137 77 126 76 114L75 101C64 101 54 96 48 88C40 78 43 68 54 63C60 60 68 62 76 68C77 61 79 55 82 50C70 48 58 43 52 36C47 29 53 23 62 27C70 29 78 34 84 40C88 35 93 31 99 28L97 16C96 9 100 4 106 4C112 4 116 9 114 16L112 25C118 24 123 24 129 26L132 15C134 8 139 5 145 7C151 9 154 15 151 21L146 33C153 33 163 30 170 33C179 36 180 44 174 49C168 55 157 57 148 56C154 64 157 74 156 84C155 98 146 109 134 115C129 118 124 120 118 121L120 148C121 160 126 171 130 181C135 194 135 207 130 219L116 219C113 207 110 194 108 182L100 182C98 194 97 207 94 219L80 219C79 205 77 192 75 181L72 181C70 194 70 207 70 219Z" fill="url(#'+g+')" stroke="#5B4A3C" stroke-width="3.6" stroke-linejoin="round"/>'+
+      '<path d="M58 37q10 3 18 10M151 41q10-3 18-1" fill="none" stroke="#C79A5A" stroke-width="2.4" opacity=".8"/>'+
+      '<path d="M78 70q9-12 20-16" fill="none" stroke="#C79A5A" stroke-width="3" opacity=".65"/>'+
+      '<path d="M78 74c10-17 29-25 47-18 20 8 27 31 17 49-11 20-35 28-54 17-18-10-20-30-10-48Z" fill="#F8E8C8" stroke="#5B4A3C" stroke-width="3.2"/>'+eye+
+      '<ellipse cx="103" cy="98" rx="2.7" ry="2" fill="#8B6548"/><ellipse cx="124" cy="98" rx="2.7" ry="2" fill="#8B6548"/>'+mouth+
+      '<g fill="'+c.spot+'" opacity=".92"><path d="M101 37q8-9 15-2t1 15q-9 4-16-2t0-11Z"/><path d="M128 52q8-5 14 1t-1 13q-8 2-13-3t0-11Z"/><path d="M82 124q10-7 18 2t-2 17q-11 2-16-6t0-13Z"/><path d="M106 143q10-8 19 1t-1 18q-11 4-18-5t0-14Z"/><path d="M78 163q8-5 14 2t-1 14q-9 2-14-5t1-11Z"/><path d="M113 177q8-5 14 2t-1 14q-9 2-14-5t1-11Z"/></g>'+accessory(c)+'</g></svg>';
+  }
+
+  function gameIcon(type) {
+    var map = {
