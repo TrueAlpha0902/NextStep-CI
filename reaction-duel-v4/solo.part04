@@ -1,0 +1,53 @@
+    var cpuAimX = -c.windX + rand(-cfg.aimNoise, cfg.aimNoise);
+    var cpuAimY = -c.windY + rand(-cfg.aimNoise, cfg.aimNoise);
+    var pp = archeryPoints(c.aim.x, c.aim.y, c.windX, c.windY);
+    var cp = archeryPoints(cpuAimX, cpuAimY, -c.windX, c.windY);
+    var winner = pp === cp ? 'tie' : (pp > cp ? 'player' : 'cpu');
+    finishRound(winner, winner === 'tie' ? '同分' : (winner === 'player' ? '你的箭更準' : '電腦的箭更準'), '風向已計入雙方落點。', pp + ' 分', cp + ' 分', pp, cp);
+  }
+
+  function marbleOutcome(action, side) {
+    var start = side === 'player' ? {x:-.82,y:.62} : {x:.82,y:.62};
+    var dx = action.x - start.x, dy = action.y - start.y, len = Math.max(.001, Math.sqrt(dx*dx+dy*dy));
+    var travel = 1.25 * action.power;
+    return { x:start.x + dx/len*travel, y:start.y + dy/len*travel, power:action.power };
+  }
+  function marblePoints(p) { return Math.max(0, Math.round(10 - Math.sqrt(p.x*p.x+p.y*p.y)*8)); }
+  function shootMarbles() {
+    var c = solo.current, cfg = config();
+    var cpuAction = { x:rand(-cfg.aimNoise,cfg.aimNoise), y:rand(-cfg.aimNoise,cfg.aimNoise), power:clamp(.84+rand(-cfg.aimNoise,cfg.aimNoise),.35,1) };
+    var p1 = marbleOutcome({x:c.aim.x,y:c.aim.y,power:c.power}, 'player');
+    var p2 = marbleOutcome(cpuAction, 'cpu');
+    var dx=p2.x-p1.x,dy=p2.y-p1.y,dist=Math.max(.001,Math.sqrt(dx*dx+dy*dy)),collision=false;
+    if(dist<.26){collision=true;var overlap=.26-dist,nx=dx/dist,ny=dy/dist,bias=(p1.power-p2.power)*.12;p1.x-=nx*overlap*.62-nx*bias;p1.y-=ny*overlap*.62-ny*bias;p2.x+=nx*overlap*.62+nx*bias;p2.y+=ny*overlap*.62+ny*bias;}
+    var pp=marblePoints(p1),cp=marblePoints(p2),winner=pp===cp?'tie':pp>cp?'player':'cpu';
+    finishRound(winner,winner==='tie'?'同分':winner==='player'?'你的彈珠更接近中心':'電腦更接近中心',collision?'兩顆彈珠發生碰撞，位置已重新計算。':'本回合沒有發生碰撞。',pp+' 分',cp+' 分',pp,cp);
+  }
+
+  function towerPlace(actor, x) {
+    var t=solo.current,prev=t.blocks[t.blocks.length-1],left=Math.max(prev.x-prev.width/2,x-prev.width/2),right=Math.min(prev.x+prev.width/2,x+prev.width/2),overlap=right-left;
+    if(overlap<.115){finishInstantMatch(actor==='player'?'cpu':'player',actor==='player'?'你的高塔倒了':'電腦的高塔倒了','積木完全沒有重疊。');return;}
+    t.blocks.push({x:(left+right)/2,width:overlap});
+    if(t.blocks.length-1>=12){finishInstantMatch(actor,actor==='player'?'你完成 12 層！':'電腦完成 12 層','高塔成功完成。');return;}
+    t.turn=actor==='player'?'cpu':'player';renderSolo();if(t.turn==='cpu')scheduleCpuTower();
+  }
+  function scheduleCpuTower() { addTimer(setTimeout(function(){if(!solo||solo.phase!=='playing')return;var t=solo.current,prev=t.blocks[t.blocks.length-1],noise=config().towerNoise*(1+(t.blocks.length-1)*.035),x=prev.x+rand(-noise,noise);towerPlace('cpu',x);},650)); }
+
+  function removePairs(hand) {
+    var groups={},keep=[];
+    hand.forEach(function(c){(groups[c.value]||(groups[c.value]=[])).push(c);});
+    Object.keys(groups).forEach(function(k){if(groups[k].length%2)keep.push(groups[k][groups[k].length-1]);});
+    return keep.sort(function(a,b){return a.value-b.value;});
+  }
+  function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  function createOldMaid(){var deck=[];for(var v=1;v<=8;v++){deck.push({id:v+'a',value:v},{id:v+'b',value:v});}deck.push({id:'ghost',value:99});shuffle(deck);var p=[],c=[];deck.forEach(function(card,i){(i%2?p:c).push(card);});return{player:removePairs(p),cpu:removePairs(c),turn:'player'};}
+  function drawMaid(actor,index){var m=solo.current,from=actor==='player'?m.cpu:m.player,to=actor==='player'?m.player:m.cpu;index=clamp(Math.floor(index),0,from.length-1);to.push(from.splice(index,1)[0]);if(actor==='player')m.player=removePairs(to);else m.cpu=removePairs(to);if(!m.player.length||!m.cpu.length){var winner=!m.player.length?'player':'cpu';finishInstantMatch(winner,winner==='player'?'你先清空手牌':'電腦先清空手牌','最後持有鬼牌的一方落敗。');return;}m.turn=actor==='player'?'cpu':'player';renderSolo();if(m.turn==='cpu')scheduleCpuMaid();}
+  function scheduleCpuMaid(){addTimer(setTimeout(function(){if(!solo||solo.phase!=='playing')return;var m=solo.current,cfg=config(),idx=Math.floor(Math.random()*m.player.length);if(Math.random()<cfg.oldMaidSkill){var matches=[];for(var i=0;i<m.player.length;i++){var val=m.player[i].value;if(val!==99&&m.cpu.some(function(x){return x.value===val;}))matches.push(i);}if(matches.length)idx=matches[Math.floor(Math.random()*matches.length)];else{var ghost=m.player.findIndex(function(x){return x.value===99;});if(ghost===idx&&m.player.length>1)idx=(idx+1)%m.player.length;}}drawMaid('cpu',idx);},700));}
+
+  function generateMaze(width,height){var total=width*height,cells=new Array(total).fill(0),seen=new Array(total).fill(false),stack=[0],dirs=[{dx:0,dy:-1,b:1,o:4},{dx:1,dy:0,b:2,o:8},{dx:0,dy:1,b:4,o:1},{dx:-1,dy:0,b:8,o:2}];seen[0]=true;while(stack.length){var cur=stack[stack.length-1],x=cur%width,y=Math.floor(cur/width),opts=dirs.filter(function(d){var nx=x+d.dx,ny=y+d.dy;return nx>=0&&nx<width&&ny>=0&&ny<height&&!seen[ny*width+nx];});if(!opts.length){stack.pop();continue;}var d=opts[Math.floor(Math.random()*opts.length)],next=(y+d.dy)*width+x+d.dx;cells[cur]|=d.b;cells[next]|=d.o;seen[next]=true;stack.push(next);}return{width:width,height:height,cells:cells,goal:total-1};}
+  function shortestPath(board,start,goal){var q=[start],prev=new Array(board.cells.length).fill(-1),seen=new Array(board.cells.length).fill(false);seen[start]=true;var moves=[{b:1,d:-board.width},{b:2,d:1},{b:4,d:board.width},{b:8,d:-1}];while(q.length){var cur=q.shift();if(cur===goal)break;moves.forEach(function(m){if(board.cells[cur]&m.b){var n=cur+m.d;if(n>=0&&n<board.cells.length&&!seen[n]){seen[n]=true;prev[n]=cur;q.push(n);}}});}var path=[],p=goal;while(p!==-1&&p!==start){path.push(p);p=prev[p];}path.push(start);return path.reverse();}
+  function createMazeGame(){var b=generateMaze(9,9);return{board:b,playerPos:0,cpuPos:0,playerMoves:0,cpuMoves:0,cpuPath:shortestPath(b,0,b.goal),cpuIndex:0};}
+  function mazeCan(dir,pos){var m=solo.current,b=m.board,bit={up:1,right:2,down:4,left:8}[dir];return Boolean(b.cells[pos]&bit);}
+  function mazeNext(dir,pos){var w=solo.current.board.width;return pos+({up:-w,right:1,down:w,left:-1}[dir]);}
+  function movePlayerMaze(dir){var m=solo.current;if(!mazeCan(dir,m.playerPos))return;m.playerPos=mazeNext(dir,m.playerPos);m.playerMoves++;if(m.playerPos===m.board.goal){finishInstantMatch('player','你先抵達終點','完成迷宮共使用 '+m.playerMoves+' 步。');return;}renderSolo();}
+  function startCpuMaze(){var cfg=config();solo.interval=setInterval(function(){if(!solo||solo.phase!=='playing')return;var m=solo.current;if(m.cpuIndex<m.cpuPath.length-1){m.cpuIndex++;m.cpuPos=m.cpuPath[m.cpuIndex];m.cpuMoves++;if(m.cpuPos===m.board.goal){finishInstantMatch('cpu','電腦先抵達終點','電腦以 '+m.cpuMoves+' 步完成迷宮。');return;}renderSolo();}},cfg.mazeDelay);}
