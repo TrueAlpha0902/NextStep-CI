@@ -1,0 +1,118 @@
+(function () {
+  'use strict';
+
+  var app = document.getElementById('app');
+  var ART = window.RD_ART;
+  if (!app || !ART) return;
+
+  var MODE_KEY = 'rd4_mode';
+  var DIFF_KEY = 'rd4_difficulty';
+  function safeGet(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
+  function safeSet(key, value) { try { window.localStorage.setItem(key, value); } catch (e) {} }
+  var mode = safeGet(MODE_KEY) || 'multi';
+  var difficulty = safeGet(DIFF_KEY) || 'normal';
+  var solo = null;
+  var timers = [];
+  var animationFrame = 0;
+  var decorating = false;
+
+  var LEVELS = {
+    easy: { label: '輕鬆', sub: '適合熟悉操作', reactionMin: 430, reactionMax: 650, aimNoise: .29, towerNoise: .24, mazeDelay: 650, oldMaidSkill: .15 },
+    normal: { label: '標準', sub: '接近一般玩家', reactionMin: 265, reactionMax: 430, aimNoise: .15, towerNoise: .12, mazeDelay: 380, oldMaidSkill: .52 },
+    hard: { label: '高手', sub: '用來壓力測試', reactionMin: 165, reactionMax: 285, aimNoise: .06, towerNoise: .045, mazeDelay: 205, oldMaidSkill: .9 }
+  };
+
+  function store(key, value) { safeSet(key, value); }
+  function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function rand(min, max) { return min + Math.random() * (max - min); }
+  function clamp(n, min, max) { return Math.max(min, Math.min(max, Number(n) || 0)); }
+  function config() { return LEVELS[difficulty] || LEVELS.normal; }
+  function vibrate(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern || 18); } catch (e) {} }
+  function addTimer(id) { timers.push(id); return id; }
+  function clearTimers() { while (timers.length) clearTimeout(timers.pop()); clearInterval(solo && solo.interval); cancelAnimationFrame(animationFrame); animationFrame = 0; }
+  function playerName() { var el = document.getElementById('nameInput'); return (el && el.value.trim()) || safeGet('rd3_name') || '小鹿'; }
+  function playerCharacter() { var n = Number(safeGet('rd3_character') || 1); return n >= 1 && n <= 5 ? n : 1; }
+  function cpuCharacter(player) { var n = 1 + Math.floor(Math.random() * 5); return n === player ? (n % 5) + 1 : n; }
+  function game(id) { return ART.games[id]; }
+  function isReaction(id) { return id === 'color' || id === 'number' || id === 'shape' || id === 'shadow'; }
+
+  function difficultyButtons(compact) {
+    var html = '<div class="difficulty-grid' + (compact ? ' compact' : '') + '">';
+    ['easy','normal','hard'].forEach(function (id) {
+      var d = LEVELS[id];
+      html += '<button type="button" class="difficulty-btn ' + (difficulty === id ? 'selected' : '') + '" data-difficulty="' + id + '"><b>' + d.label + '</b><small>' + d.sub + '</small></button>';
+    });
+    return html + '</div>';
+  }
+
+  function decorateHome() {
+    if (solo || decorating) return;
+    var setup = app.querySelector('.setup-grid');
+    var hero = app.querySelector('.hero');
+    if (!setup || !hero) return;
+    decorating = true;
+    var old = app.querySelector('.mode-lab');
+    if (old) old.remove();
+    var panel = document.createElement('section');
+    panel.className = 'card mode-lab';
+    panel.innerHTML = '<div class="mode-tabs"><button type="button" data-mode="multi" class="' + (mode === 'multi' ? 'selected' : '') + '">雙人連線</button><button type="button" data-mode="solo" class="' + (mode === 'solo' ? 'selected' : '') + '">單人電腦 PK</button></div>' +
+      '<div class="mode-copy"><p class="kicker">PLAY MODE</p><h2>' + (mode === 'solo' ? '單人測試模式' : '雙人即時對戰') + '</h2><p>' + (mode === 'solo' ? '不需要建立房間。選擇電腦強度後，可以直接測試所有遊戲流程。' : '兩位玩家使用不同裝置，以六位房間碼連線。') + '</p></div>' +
+      '<div class="difficulty-wrap ' + (mode === 'solo' ? '' : 'disabled') + '"><span>電腦強度</span>' + difficultyButtons(true) + '</div>';
+    setup.parentNode.insertBefore(panel, setup);
+    setup.style.display = mode === 'solo' ? 'grid' : '';
+    var join = setup.querySelector('.join-row');
+    if (join) join.style.display = mode === 'solo' ? 'none' : '';
+    var head = app.querySelector('.section-head span');
+    if (head) head.textContent = mode === 'solo' ? '9 款可直接測試' : '9 款雙人對戰';
+    var buttons = app.querySelectorAll('[data-create-game]');
+    for (var i = 0; i < buttons.length; i++) buttons[i].textContent = mode === 'solo' ? '挑戰電腦 →' : '建立房間 →';
+    bindHomeExtras(panel);
+    decorating = false;
+  }
+
+  function bindHomeExtras(panel) {
+    var modes = panel.querySelectorAll('[data-mode]');
+    for (var i = 0; i < modes.length; i++) modes[i].onclick = function () { mode = this.getAttribute('data-mode'); store(MODE_KEY, mode); decorateHome(); };
+    var levels = panel.querySelectorAll('[data-difficulty]');
+    for (var j = 0; j < levels.length; j++) levels[j].onclick = function () { difficulty = this.getAttribute('data-difficulty'); store(DIFF_KEY, difficulty); decorateHome(); };
+  }
+
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest && event.target.closest('[data-create-game]');
+    if (!button || mode !== 'solo' || solo) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    startSolo(button.getAttribute('data-create-game'));
+  }, true);
+
+  var observer = new MutationObserver(function () { if (!solo) setTimeout(decorateHome, 0); });
+  observer.observe(app, { childList: true, subtree: false });
+  setTimeout(decorateHome, 0);
+
+  function soloShell(content) {
+    return '<div class="shell sketch-shell"><header class="topbar"><button type="button" class="back" id="soloExit" aria-label="返回首頁">←</button><div class="solo-brand">' + ART.giraffe(solo.player.character, 'idle') + '<div><b>Reaction Duel</b><small>單人電腦 PK</small></div></div><span class="connection cpu">電腦・' + LEVELS[difficulty].label + '</span></header>' + content + '</div>';
+  }
+
+  function startSolo(gameId) {
+    clearTimers();
+    var pchar = playerCharacter();
+    solo = {
+      gameId: gameId,
+      phase: 'intro',
+      player: { name: playerName(), character: pchar },
+      cpu: { name: '電腦長頸鹿', character: cpuCharacter(pchar) },
+      round: 1,
+      maxRounds: (gameId === 'tower' || gameId === 'oldmaid' || gameId === 'maze') ? 1 : 5,
+      scores: { player: 0, cpu: 0 },
+      current: null,
+      result: null,
+      match: null,
+      interval: 0
+    };
+    renderSolo();
+  }
+
+  function introView() {
+    var g = game(solo.gameId);
+    return soloShell('<section class="card solo-intro"><div class="solo-intro-art">' + ART.giraffe(solo.player.character, 'think') + '</div><div class="solo-intro-copy"><p class="kicker">HOW TO PLAY</p><h1>' + g.title + '</h1><p>' + g.summary + '</p><ul class="rules">' + g.rules.map(function (r, i) { return '<li><i>' + (i + 1) + '</i><span>' + r + '</span></li>'; }).join('') + '</ul></div></section>' +
