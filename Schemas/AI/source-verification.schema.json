@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/source-verification-v1.json",
+  "title": "NextStep Source Verification Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "sourceCandidateID", "verifiedAt", "status", "accessLevel", "canonicalMetadata", "checks", "conflicts", "allowedClaimScope"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "sourceCandidateID": { "$ref": "#/$defs/uuid" },
+    "verifiedAt": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["verified", "partiallyVerified", "unverified", "conflicting", "unavailable"] },
+    "accessLevel": { "enum": ["userProvidedFullText", "legalFullText", "abstractOnly", "metadataOnly", "unavailable"] },
+    "canonicalMetadata": {
+      "type": "object", "additionalProperties": false,
+      "required": ["title", "authors", "publicationYear", "venue", "doi", "officialURL", "fullTextURL", "contentSHA256"],
+      "properties": {
+        "title": { "type": ["string", "null"], "minLength": 1, "maxLength": 2000 },
+        "authors": { "type": "array", "maxItems": 500, "items": { "type": "string", "minLength": 1, "maxLength": 300 } },
+        "publicationYear": { "type": ["integer", "null"], "minimum": 1000, "maximum": 3000 },
+        "venue": { "type": ["string", "null"], "minLength": 1, "maxLength": 1000 },
+        "doi": { "type": ["string", "null"], "maxLength": 300 },
+        "officialURL": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+        "fullTextURL": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+        "contentSHA256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "checks": {
+      "type": "array", "minItems": 1, "maxItems": 100,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["kind", "status", "connector", "recordID", "detail"],
+        "properties": {
+          "kind": { "enum": ["title", "author", "year", "venue", "doiResolution", "officialURL", "legalAccess", "peerReview", "preprint", "contentHash"] },
+          "status": { "enum": ["match", "mismatch", "notAvailable", "notChecked"] },
+          "connector": { "type": "string", "minLength": 1, "maxLength": 50 },
+          "recordID": { "type": ["string", "null"], "maxLength": 500 },
+          "detail": { "type": ["string", "null"], "maxLength": 1000 }
+        }
+      }
+    },
+    "conflicts": { "type": "array", "maxItems": 100, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+    "allowedClaimScope": { "enum": ["fullText", "abstract", "metadata", "none"] }
+  },
+  "$defs": { "uuid": { "type": "string", "format": "uuid" } }
+}

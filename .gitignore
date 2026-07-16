@@ -1,0 +1,30 @@
+# XcodeGen output (regenerate with scripts/generate-project.*)
+/Notes.xcodeproj/
+
+# Xcode and Swift build products
+/build/
+/.build/
+/DerivedData/
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.xcarchive
+*.xcresult
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager local state
+/.swiftpm/
+
+# Local editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local-only configuration and downloaded model payloads
+/Config/Local.xcconfig
+/Models/
+
+# Verified iPad install artifacts and simulator screenshots (local only)
+/.local/

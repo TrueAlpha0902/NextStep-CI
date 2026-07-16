@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/citation-v1.json",
+  "title": "NextStep Citation Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "citationID", "paperSourceID", "title", "authors", "publicationYear", "venue", "doi", "officialURL", "accessURL", "accessedAt", "anchorIDs", "evidenceLinkIDs", "verificationStatus"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "citationID": { "$ref": "#/$defs/uuid" },
+    "paperSourceID": { "$ref": "#/$defs/uuid" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "authors": { "type": "array", "minItems": 1, "maxItems": 500, "items": { "type": "string", "minLength": 1, "maxLength": 300 } },
+    "publicationYear": { "type": ["integer", "null"], "minimum": 1000, "maximum": 3000 },
+    "venue": { "type": ["string", "null"], "minLength": 1, "maxLength": 1000 },
+    "doi": { "type": ["string", "null"], "pattern": "^10\\.[0-9]{4,9}/[-._;()/:A-Za-z0-9]+$", "maxLength": 300 },
+    "officialURL": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+    "accessURL": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+    "accessedAt": { "type": "string", "format": "date-time" },
+    "anchorIDs": { "type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "evidenceLinkIDs": { "type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "verificationStatus": { "enum": ["verified", "partiallyVerified", "conflicting", "unverified"] }
+  },
+  "$defs": { "uuid": { "type": "string", "format": "uuid" } }
+}

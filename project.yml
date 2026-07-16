@@ -1,0 +1,378 @@
+name: Notes
+
+options:
+  minimumXcodeGenVersion: 2.45.4
+  createIntermediateGroups: true
+  xcodeVersion: "26.0"
+  deploymentTarget:
+    iOS: "18.0"
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+    SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG $(inherited)"
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+      VALIDATE_PRODUCT: YES
+
+targets:
+  NotesCore:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NotesCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.core
+        PRODUCT_NAME: NotesCore
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  NotesServices:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NotesServices
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.services
+        PRODUCT_NAME: NotesServices
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  NextStepAcademic:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NextStepAcademic
+    dependencies:
+      - target: NotesCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepacademic
+        PRODUCT_NAME: NextStepAcademic
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  NextStepDomain:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NextStepDomain
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepdomain
+        PRODUCT_NAME: NextStepDomain
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  NextStepGrounding:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NextStepGrounding
+    dependencies:
+      - target: NextStepDomain
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepgrounding
+        PRODUCT_NAME: NextStepGrounding
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  NextStepPlanning:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NextStepPlanning
+    dependencies:
+      - target: NextStepDomain
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepplanning
+        PRODUCT_NAME: NextStepPlanning
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  NextStepSync:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NextStepSync
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepsync
+        PRODUCT_NAME: NextStepSync
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  NextStepDesignSystem:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NextStepDesignSystem
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepdesignsystem
+        PRODUCT_NAME: NextStepDesignSystem
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  NotesApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Sources/NotesApp
+    dependencies:
+      - target: NotesCore
+      - target: NotesServices
+      - target: NextStepAcademic
+      - target: NextStepDomain
+      - target: NextStepGrounding
+      - target: NextStepPlanning
+      - target: NextStepSync
+      - target: NextStepDesignSystem
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes
+        PRODUCT_NAME: Notes
+        PRODUCT_MODULE_NAME: NotesApp
+        INFOPLIST_FILE: Config/NotesApp-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        VERSIONING_SYSTEM: apple-generic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+
+  NotesCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NotesCoreTests
+    dependencies:
+      - target: NotesCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.coretests
+        PRODUCT_NAME: NotesCoreTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  NotesServicesTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NotesServicesTests
+    dependencies:
+      - target: NotesServices
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.servicestests
+        PRODUCT_NAME: NotesServicesTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  NextStepAcademicTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NextStepAcademicTests
+    dependencies:
+      - target: NextStepAcademic
+      - target: NotesCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepacademictests
+        PRODUCT_NAME: NextStepAcademicTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  NextStepDomainTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NextStepDomainTests
+    dependencies:
+      - target: NextStepDomain
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepdomaintests
+        PRODUCT_NAME: NextStepDomainTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  NextStepGroundingTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NextStepGroundingTests
+    dependencies:
+      - target: NextStepDomain
+      - target: NextStepGrounding
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepgroundingtests
+        PRODUCT_NAME: NextStepGroundingTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  NextStepPlanningTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NextStepPlanningTests
+    dependencies:
+      - target: NextStepDomain
+      - target: NextStepPlanning
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepplanningtests
+        PRODUCT_NAME: NextStepPlanningTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  NextStepSyncTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NextStepSyncTests
+    dependencies:
+      - target: NextStepSync
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepsynctests
+        PRODUCT_NAME: NextStepSyncTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  NextStepDesignSystemTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NextStepDesignSystemTests
+    dependencies:
+      - target: NextStepDesignSystem
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.nextstepdesignsystemtests
+        PRODUCT_NAME: NextStepDesignSystemTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  NotesAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NotesAppTests
+    dependencies:
+      - target: NotesApp
+      - target: NotesServices
+      - target: NextStepAcademic
+      - target: NextStepDomain
+      - target: NextStepGrounding
+      - target: NextStepPlanning
+      - target: NextStepSync
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.apptests
+        PRODUCT_NAME: NotesAppTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: NotesApp
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Notes.app/Notes"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  NotesAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: Tests/NotesAppUITests
+    dependencies:
+      - target: NotesApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.speci.localnotes.uitests
+        PRODUCT_NAME: NotesAppUITests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: NotesApp
+
+schemes:
+  Notes:
+    build:
+      targets:
+        NotesCore: all
+        NotesServices: all
+        NextStepAcademic: all
+        NextStepDomain: all
+        NextStepGrounding: all
+        NextStepPlanning: all
+        NextStepSync: all
+        NextStepDesignSystem: all
+        NotesApp: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - name: NotesCoreTests
+          parallelizable: false
+        - name: NotesServicesTests
+          parallelizable: false
+        - name: NextStepAcademicTests
+          parallelizable: false
+        - name: NextStepDomainTests
+          parallelizable: false
+        - name: NextStepGroundingTests
+          parallelizable: false
+        - name: NextStepPlanningTests
+          parallelizable: false
+        - name: NextStepSyncTests
+          parallelizable: false
+        - name: NextStepDesignSystemTests
+          parallelizable: false
+        - name: NotesAppTests
+          parallelizable: false
+        - name: NotesAppUITests
+          parallelizable: false
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

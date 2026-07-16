@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/document-parse-v2.json",
+  "title": "NextStep Document Parse Result v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "sourceDocumentID", "sourceSHA256", "status", "parser", "languages", "pages", "factCandidates", "warnings"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "sourceDocumentID": { "$ref": "#/$defs/uuid" },
+    "sourceSHA256": { "$ref": "#/$defs/sha256" },
+    "status": { "enum": ["complete", "partial", "unsupported", "failed"] },
+    "parser": {
+      "type": "object", "additionalProperties": false,
+      "required": ["identifier", "version", "executedOnDevice"],
+      "properties": {
+        "identifier": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "executedOnDevice": { "type": "boolean" }
+      }
+    },
+    "languages": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$" } },
+    "pages": {
+      "type": "array", "maxItems": 10000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["pageIndex", "widthPoints", "heightPoints", "blocks"],
+        "properties": {
+          "pageIndex": { "type": "integer", "minimum": 0, "maximum": 999999 },
+          "widthPoints": { "type": "number", "exclusiveMinimum": 0, "maximum": 100000 },
+          "heightPoints": { "type": "number", "exclusiveMinimum": 0, "maximum": 100000 },
+          "blocks": {
+            "type": "array", "maxItems": 10000,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["blockID", "kind", "text", "anchorID", "confidence"],
+              "properties": {
+                "blockID": { "$ref": "#/$defs/uuid" },
+                "kind": { "enum": ["title", "heading", "paragraph", "list", "table", "caption", "formula", "unknown"] },
+                "text": { "type": "string", "minLength": 1, "maxLength": 100000 },
+                "anchorID": { "$ref": "#/$defs/uuid" },
+                "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "factCandidates": {
+      "type": "array", "maxItems": 5000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["candidateID", "kind", "value", "anchorIDs", "occurrences", "confidence", "requiresUserConfirmation"],
+        "properties": {
+          "candidateID": { "$ref": "#/$defs/uuid" },
+          "kind": { "enum": ["title", "author", "date", "deadline", "courseCode", "credit", "grade", "requirement", "other"] },
+          "value": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "anchorIDs": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+          "occurrences": {
+            "type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["anchorID", "utf16Start", "utf16Length"],
+              "properties": {
+                "anchorID": { "$ref": "#/$defs/uuid" },
+                "utf16Start": { "type": "integer", "minimum": 0, "maximum": 10000000 },
+                "utf16Length": { "type": "integer", "minimum": 1, "maximum": 100000 }
+              }
+            }
+          },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "requiresUserConfirmation": { "type": "boolean" }
+        }
+      }
+    },
+    "warnings": { "type": "array", "maxItems": 100, "items": { "type": "string", "minLength": 1, "maxLength": 500 } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

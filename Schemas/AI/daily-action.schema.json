@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/daily-action-v1.json",
+  "title": "NextStep Daily Action Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "actionID", "primaryMilestoneID", "weeklyOutcomeID", "title", "scheduledLocalDate", "scheduledWindow", "deadline", "estimatedMinutes", "difficulty", "priority", "status", "flexibility", "reasonCodes", "whyToday", "requiredOutput", "completionCriteriaIDs", "sourceIDs", "packageID", "confidence", "assumptions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "actionID": { "$ref": "#/$defs/uuid" },
+    "primaryMilestoneID": { "$ref": "#/$defs/uuid" },
+    "weeklyOutcomeID": { "$ref": "#/$defs/uuid" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "scheduledLocalDate": { "type": "string", "format": "date" },
+    "scheduledWindow": {
+      "type": ["object", "null"], "additionalProperties": false,
+      "required": ["start", "end", "timeZone"],
+      "properties": {
+        "start": { "type": "string", "format": "date-time" },
+        "end": { "type": "string", "format": "date-time" },
+        "timeZone": { "type": "string", "minLength": 1, "maxLength": 100 }
+      }
+    },
+    "deadline": { "type": ["string", "null"], "format": "date-time" },
+    "estimatedMinutes": { "enum": [15, 25, 35, 45, 60, 90, 120] },
+    "difficulty": { "enum": ["introductory", "standard", "challenging"] },
+    "priority": { "enum": ["must", "should", "backlog"] },
+    "status": { "enum": ["proposed", "readyCandidate", "blocked"] },
+    "flexibility": { "enum": ["locked", "confirmationRequired", "flexible"] },
+    "reasonCodes": { "type": "array", "minItems": 1, "maxItems": 10, "uniqueItems": true, "items": { "enum": ["hardDeadline", "criticalPath", "dependencyUnblock", "goalPriority", "reviewDue", "learningGap", "userCommitment", "availableCapacity"] } },
+    "whyToday": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "requiredOutput": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "completionCriteriaIDs": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "sourceIDs": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "packageID": { "type": ["string", "null"], "format": "uuid" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "assumptions": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 500 } }
+  },
+  "$defs": { "uuid": { "type": "string", "format": "uuid" } }
+}

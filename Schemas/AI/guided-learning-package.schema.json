@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/guided-learning-package-v1.json",
+  "title": "NextStep Guided Learning Package Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "packageID", "actionID", "actionRevision", "status", "lineage", "title", "whyToday", "estimatedMinutes", "difficulty", "objectives", "prerequisiteConceptIDs", "sourceIDs", "requiredReading", "contentSegments", "highlightIDs", "keyPoints", "knowledgeItems", "guidedQuestions", "quizID", "requiredOutput", "completionCriteria", "nextStep", "feedbackOptions", "replanningState", "confidence", "unresolvedIssues"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "packageID": { "$ref": "#/$defs/uuid" },
+    "actionID": { "$ref": "#/$defs/uuid" },
+    "actionRevision": { "type": "integer", "minimum": 0 },
+    "status": { "enum": ["draft", "readyCandidate", "blocked", "sourceUnavailable"] },
+    "lineage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ultimateGoalID", "goalID", "milestoneID", "weeklyOutcomeID"],
+      "properties": {
+        "ultimateGoalID": { "$ref": "#/$defs/uuid" },
+        "goalID": { "$ref": "#/$defs/uuid" },
+        "milestoneID": { "$ref": "#/$defs/uuid" },
+        "weeklyOutcomeID": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "whyToday": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reasonCodes", "explanation"],
+      "properties": {
+        "reasonCodes": { "type": "array", "minItems": 1, "maxItems": 10, "uniqueItems": true, "items": { "enum": ["hardDeadline", "criticalPath", "dependencyUnblock", "goalPriority", "reviewDue", "learningGap", "userCommitment", "availableCapacity"] } },
+        "explanation": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "estimatedMinutes": { "enum": [15, 25, 35, 45, 60, 90, 120] },
+    "difficulty": { "enum": ["introductory", "standard", "challenging"] },
+    "objectives": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/$defs/objective" } },
+    "prerequisiteConceptIDs": { "type": "array", "maxItems": 50, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "sourceIDs": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "requiredReading": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/reading" } },
+    "contentSegments": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/contentSegment" } },
+    "highlightIDs": { "type": "array", "maxItems": 200, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "keyPoints": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/keyPoint" } },
+    "knowledgeItems": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/knowledgeItem" } },
+    "guidedQuestions": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+    "quizID": { "type": ["string", "null"], "format": "uuid" },
+    "requiredOutput": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "instruction"],
+      "properties": {
+        "kind": { "enum": ["note", "answer", "draft", "artifact", "decision", "practice", "externalConfirmation"] },
+        "instruction": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "completionCriteria": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/$defs/criterion" } },
+    "nextStep": { "type": ["string", "null"], "maxLength": 1000 },
+    "feedbackOptions": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "enum": ["insufficientTime", "tooDifficult", "alreadyKnow", "moreExplanation", "moreExamples", "delay", "split", "changeMethod"] } },
+    "replanningState": { "enum": ["none", "evaluationRequired", "proposalPending", "protectedConfirmationRequired"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "unresolvedIssues": { "type": "array", "maxItems": 50, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "objective": {
+      "type": "object", "additionalProperties": false,
+      "required": ["objectiveID", "statement"],
+      "properties": { "objectiveID": { "$ref": "#/$defs/uuid" }, "statement": { "type": "string", "minLength": 1, "maxLength": 1000 } }
+    },
+    "reading": {
+      "type": "object", "additionalProperties": false,
+      "required": ["anchorID", "purpose", "estimatedMinutes"],
+      "properties": { "anchorID": { "$ref": "#/$defs/uuid" }, "purpose": { "type": "string", "minLength": 1, "maxLength": 500 }, "estimatedMinutes": { "type": "integer", "minimum": 1, "maximum": 120 } }
+    },
+    "contentSegment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "text", "anchorIDs", "rightsBasis"],
+      "properties": {
+        "kind": { "enum": ["lawfulExcerpt", "extractiveSummary", "generatedExplanation"] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "anchorIDs": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+        "rightsBasis": { "enum": ["userProvided", "openLicensed", "necessaryQuotation", "derivedSummary"] }
+      }
+    },
+    "keyPoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["statement", "category", "evidenceLinkIDs"],
+      "properties": {
+        "statement": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "category": { "enum": ["conclusion", "definition", "formula", "method", "data", "case", "application", "limitation", "risk", "controversy", "knowledgeLink"] },
+        "evidenceLinkIDs": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } }
+      }
+    },
+    "knowledgeItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "statement", "conceptIDs", "evidenceLinkIDs"],
+      "properties": {
+        "kind": { "enum": ["definition", "formula", "researchMethod", "case", "application", "limitation", "controversy", "risk", "existingKnowledgeLink"] },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 3000 },
+        "conceptIDs": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+        "evidenceLinkIDs": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } }
+      }
+    },
+    "criterion": {
+      "type": "object", "additionalProperties": false,
+      "required": ["criterionID", "kind", "description", "threshold", "requiresUserConfirmation"],
+      "properties": {
+        "criterionID": { "$ref": "#/$defs/uuid" },
+        "kind": { "enum": ["artifactExists", "requiredFields", "quizScore", "readingAcknowledged", "userAttestation"] },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "threshold": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "requiresUserConfirmation": { "type": "boolean" }
+      }
+    }
+  }
+}

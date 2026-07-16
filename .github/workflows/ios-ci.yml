@@ -1,0 +1,760 @@
+name: iOS CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      capture_final_previews:
+        description: Capture final iPhone and iPad acceptance previews
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  # GitHub-hosted runners switched to Node 24 in June 2026. Keep JavaScript
+  # actions on the current runtime explicitly so deprecation changes fail early.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NEXTSTEP_CAPTURE_FINAL_PREVIEWS: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_final_previews && '1' || '0' }}
+
+concurrency:
+  group: ios-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-package:
+    name: Build, test, and package
+    runs-on: macos-26
+    timeout-minutes: 70
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Bind build to source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_EVENT_NAME" in
+            pull_request)
+              expected_repository="$(jq -r '.pull_request.head.repo.full_name // empty' "$GITHUB_EVENT_PATH")"
+              expected_commit="$(jq -r '.pull_request.head.sha // empty' "$GITHUB_EVENT_PATH")"
+              [[ "$expected_repository" == "$GITHUB_REPOSITORY" ]]
+              ;;
+            push|workflow_dispatch)
+              expected_commit="$GITHUB_SHA"
+              ;;
+            *)
+              echo "Unsupported workflow event: $GITHUB_EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+          built_commit="$(git rev-parse HEAD)"
+          [[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$built_commit" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$built_commit" == "$expected_commit" ]]
+          echo "BUILD_COMMIT_SHA=$built_commit" >> "$GITHUB_ENV"
+
+      - name: Verify Xcode 26
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcode_version="$(xcodebuild -version | sed -n '1p')"
+          grep -Eq '^Xcode 26([.]|$)' <<< "$xcode_version"
+
+      - name: Install XcodeGen
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Validate configuration
+        shell: bash
+        run: bash scripts/validate-project.sh
+
+      - name: Validate Windows contract preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check PreviewWeb/core.mjs
+          node --check PreviewWeb/app.mjs
+          node PreviewWeb/tests/state.smoke.mjs
+          grep -Fq 'Contract preview — not the iOS app' PreviewWeb/index.html
+          grep -Fq "connect-src 'none'" PreviewWeb/index.html
+
+      - name: Generate Xcode project
+        shell: bash
+        run: bash scripts/generate-project.sh
+
+      - name: Select an available iPad simulator
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          simulator_udid=""
+          xcode_destinations=""
+          for attempt in 1 2 3; do
+            xcode_destinations="$(xcodebuild -project Notes.xcodeproj -scheme Notes -showdestinations 2>&1 || true)"
+            simulator_udid="$({
+              xcrun simctl list devices available --json \
+                | jq -r '.devices[][] | select(.name | startswith("iPad")) | .udid'
+            } | while read -r candidate; do
+              if grep -Fq "$candidate" <<< "$xcode_destinations"; then
+                echo "$candidate"
+                break
+              fi
+            done)"
+            [[ -n "$simulator_udid" ]] && break
+            sleep 5
+          done
+          if [[ -z "$simulator_udid" ]]; then
+            echo "No Xcode-compatible iPad simulator was found." >&2
+            echo "$xcode_destinations" >&2
+            exit 1
+          fi
+          echo "SIMULATOR_UDID=$simulator_udid" >> "$GITHUB_ENV"
+
+          iphone_simulator_udid="$({
+            xcrun simctl list devices available --json \
+              | jq -r '.devices[][] | select(.name | startswith("iPhone")) | .udid'
+          } | while read -r candidate; do
+            if grep -Fq "$candidate" <<< "$xcode_destinations"; then
+              echo "$candidate"
+              break
+            fi
+          done)"
+          if [[ -z "$iphone_simulator_udid" ]]; then
+            echo "No Xcode-compatible iPhone simulator was found." >&2
+            echo "$xcode_destinations" >&2
+            exit 1
+          fi
+          echo "IPHONE_SIMULATOR_UDID=$iphone_simulator_udid" >> "$GITHUB_ENV"
+
+      - name: Build test products
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Notes.xcodeproj \
+            -scheme Notes \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/NotesDerivedDataTests" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build-for-testing
+
+      - name: Boot the selected iPad simulator
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl boot "$SIMULATOR_UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+
+      - name: Run unit and integration tests
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Notes.xcodeproj \
+            -scheme Notes \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/NotesDerivedDataTests" \
+            -resultBundlePath "$RUNNER_TEMP/NotesUnitTests.xcresult" \
+            -only-testing:NotesCoreTests \
+            -only-testing:NotesServicesTests \
+            -only-testing:NotesAppTests \
+            -only-testing:NextStepAcademicTests \
+            -only-testing:NextStepDomainTests \
+            -only-testing:NextStepGroundingTests \
+            -only-testing:NextStepPlanningTests \
+            -only-testing:NextStepSyncTests \
+            -only-testing:NextStepDesignSystemTests \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test-without-building
+
+      - name: Run iPad UI tests
+        timeout-minutes: 40
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Notes.xcodeproj \
+            -scheme Notes \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/NotesDerivedDataTests" \
+            -resultBundlePath "$RUNNER_TEMP/NotesUITests.xcresult" \
+            -only-testing:NotesAppUITests/NotesAppUITests \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test-without-building
+
+      - name: Boot the selected iPhone simulator
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl boot "$IPHONE_SIMULATOR_UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$IPHONE_SIMULATOR_UDID" -b
+
+      - name: Run iPhone UI tests
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Notes.xcodeproj \
+            -scheme Notes \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$IPHONE_SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/NotesDerivedDataTests" \
+            -resultBundlePath "$RUNNER_TEMP/NotesIPhoneUITests.xcresult" \
+            -only-testing:NotesAppUITests/NotesAppUITests/testNextStepResponsiveCoreScreens \
+            -only-testing:NotesAppUITests/NotesAppUITests/testNextStepBetaNativeFlow \
+            -only-testing:NotesAppUITests/NotesAppUITests/testNextStepBetaSourceFactReviewFlow \
+            -only-testing:NotesAppUITests/CompactLegacyNotesUITests/testCompactLegacyLibraryCanOpenQuickNote \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test-without-building
+
+      - name: Export NextStep iPad screenshots
+        if: env.NEXTSTEP_CAPTURE_FINAL_PREVIEWS == '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          attachments_dir="$RUNNER_TEMP/NotesUIAttachments"
+          screenshot_dir="$RUNNER_TEMP/NextStepScreenshots"
+          mkdir -p "$attachments_dir" "$screenshot_dir"
+
+          xcrun xcresulttool export attachments \
+            --path "$RUNNER_TEMP/NotesUITests.xcresult" \
+            --output-path "$attachments_dir"
+
+          jq -er '[
+            .. | objects
+            | select(
+                (.suggestedHumanReadableName? // "")
+                | startswith("NextStep-iPad-")
+              )
+            | {
+                name: .suggestedHumanReadableName,
+                file: .exportedFileName
+              }
+            | select(.file != null)
+          ] | unique_by(.name)[] | [.name, .file] | @tsv' \
+            "$attachments_dir/manifest.json" \
+            | while IFS=$'\t' read -r screenshot_name exported_file; do
+                test -f "$attachments_dir/$exported_file"
+                safe_name="$(
+                  printf '%s' "$screenshot_name" \
+                    | sed -E \
+                        -e 's/[^A-Za-z0-9._-]+/-/g' \
+                        -e 's/_[0-9]+_[0-9A-Fa-f-]+\.png$/.png/'
+                )"
+                safe_name="${safe_name%.png}"
+                output="$screenshot_dir/$safe_name.png"
+                cp "$attachments_dir/$exported_file" "$output"
+                sips -g format "$output" | grep -q 'format: png'
+              done
+
+          expected_screens=(
+            Home New-Course Documents New-Note Favorites Trash
+            Settings Settings-Advanced Quick-Note-Canvas Page-Navigator
+            Note-Search Course-Detail Course-Schedule Session-Workspace Session-Capture
+            Candidate-Review Candidate-Review-Completed Session-End
+            Session-Wrap-Up Session-Reviewed
+            Text-Document
+            Study-Set Whiteboard
+          )
+          for screen in "${expected_screens[@]}"; do
+            test -f "$screenshot_dir/NextStep-iPad-$screen.png"
+          done
+          test -f "$screenshot_dir/NextStep-iPad-Home.png"
+
+      - name: Export responsive iPhone and iPad previews
+        if: env.NEXTSTEP_CAPTURE_FINAL_PREVIEWS == '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_dir="$RUNNER_TEMP/NextStepResponsiveScreenshots"
+          mkdir -p "$output_dir"
+
+          export_device_previews() {
+            local device="$1"
+            local result_bundle="$2"
+            local attachments_dir="$RUNNER_TEMP/NextStep${device}ResponsiveAttachments"
+            mkdir -p "$attachments_dir"
+            xcrun xcresulttool export attachments \
+              --path "$result_bundle" \
+              --output-path "$attachments_dir"
+
+            jq -er '[
+              .. | objects
+              | select(
+                  (.suggestedHumanReadableName? // "")
+                  | startswith("NextStep-Responsive-")
+                )
+              | {
+                  name: .suggestedHumanReadableName,
+                  file: .exportedFileName
+                }
+              | select(.file != null)
+            ] | unique_by(.name)[] | [.name, .file] | @tsv' \
+              "$attachments_dir/manifest.json" \
+              | while IFS=$'\t' read -r screenshot_name exported_file; do
+                  test -f "$attachments_dir/$exported_file"
+                  base_name="${screenshot_name#NextStep-Responsive-}"
+                  safe_name="$(
+                    printf '%s' "$base_name" \
+                      | sed -E \
+                          -e 's/[^A-Za-z0-9._-]+/-/g' \
+                          -e 's/_[0-9]+_[0-9A-Fa-f-]+\.png$/.png/'
+                  )"
+                  safe_name="${safe_name%.png}"
+                  output="$output_dir/NextStep-$device-$safe_name.png"
+                  cp "$attachments_dir/$exported_file" "$output"
+                  sips -g format "$output" | grep -q 'format: png'
+                done
+          }
+
+          export_device_previews "iPad" "$RUNNER_TEMP/NotesUITests.xcresult"
+          export_device_previews "iPhone" "$RUNNER_TEMP/NotesIPhoneUITests.xcresult"
+
+          expected_screens=(
+            Light-Today Light-Guided-Learning Light-Paper-Reader Light-Goals Light-Workspace
+            Dark-Today Dark-Guided-Learning Dark-Paper-Reader Dark-Goals Dark-Workspace
+          )
+          for device in iPad iPhone; do
+            for screen in "${expected_screens[@]}"; do
+              test -f "$output_dir/NextStep-$device-$screen.png"
+            done
+          done
+
+      - name: Export native NextStep Beta iPhone and iPad previews
+        if: env.NEXTSTEP_CAPTURE_FINAL_PREVIEWS == '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_dir="$RUNNER_TEMP/NextStepBetaScreenshots"
+          mkdir -p "$output_dir"
+
+          export_device_previews() {
+            local device="$1"
+            local result_bundle="$2"
+            local attachments_dir="$RUNNER_TEMP/NextStep${device}BetaAttachments"
+            mkdir -p "$attachments_dir"
+            xcrun xcresulttool export attachments \
+              --path "$result_bundle" \
+              --output-path "$attachments_dir"
+
+            jq -er '[
+              .. | objects
+              | select(
+                  (.suggestedHumanReadableName? // "")
+                  | startswith("NextStep-Beta-")
+                )
+              | {
+                  name: .suggestedHumanReadableName,
+                  file: .exportedFileName
+                }
+              | select(.file != null)
+            ] | unique_by(.name)[] | [.name, .file] | @tsv' \
+              "$attachments_dir/manifest.json" \
+              | while IFS=$'\t' read -r screenshot_name exported_file; do
+                  test -f "$attachments_dir/$exported_file"
+                  base_name="${screenshot_name#NextStep-Beta-}"
+                  safe_name="$(
+                    printf '%s' "$base_name" \
+                      | sed -E \
+                          -e 's/[^A-Za-z0-9._-]+/-/g' \
+                          -e 's/_[0-9]+_[0-9A-Fa-f-]+\.png$/.png/'
+                  )"
+                  safe_name="${safe_name%.png}"
+                  output="$output_dir/NextStep-Beta-$device-$safe_name.png"
+                  cp "$attachments_dir/$exported_file" "$output"
+                  sips -g format "$output" | grep -q 'format: png'
+                done
+          }
+
+          export_device_previews "iPad" "$RUNNER_TEMP/NotesUITests.xcresult"
+          export_device_previews "iPhone" "$RUNNER_TEMP/NotesIPhoneUITests.xcresult"
+
+          expected_screens=(
+            Light-Today Light-Guided-Source Light-Completed-Evidence
+            Light-Sources-Sync Light-Progress Light-Notes-Library-Bridge
+            Light-Notes-Library-Legacy
+            Dark-Today Dark-Guided-Source Dark-Completed-Evidence
+            Dark-Sources-Sync Dark-Progress Dark-Notes-Library-Bridge
+            Dark-Notes-Library-Legacy
+          )
+          for device in iPad iPhone; do
+            for screen in "${expected_screens[@]}"; do
+              test -f "$output_dir/NextStep-Beta-$device-$screen.png"
+            done
+          done
+
+      - name: Export failed iPad UI test diagnostics
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          result_bundle="$RUNNER_TEMP/NotesUITests.xcresult"
+          diagnostics_dir="$RUNNER_TEMP/NotesUITestDiagnostics"
+          attachments_dir="$diagnostics_dir/attachments"
+
+          mkdir -p "$diagnostics_dir"
+
+          if [[ ! -d "$result_bundle" ]]; then
+            printf '%s\n' \
+              'NotesUITests.xcresult was not produced; no iPad UI diagnostics can be exported.' \
+              > "$diagnostics_dir/export-status.txt"
+            exit 0
+          fi
+
+          : > "$diagnostics_dir/export-status.txt"
+
+          if xcrun xcresulttool get test-results summary \
+              --path "$result_bundle" \
+              > "$diagnostics_dir/test-summary.json" \
+              2> "$diagnostics_dir/test-summary.stderr.txt"; then
+            printf '%s\n' 'test summary: exported' \
+              >> "$diagnostics_dir/export-status.txt"
+          else
+            printf '%s\n' \
+              'test summary: export failed; see test-summary.stderr.txt' \
+              >> "$diagnostics_dir/export-status.txt"
+          fi
+
+          mkdir -p "$attachments_dir"
+
+          if xcrun xcresulttool export attachments \
+              --path "$result_bundle" \
+              --output-path "$attachments_dir" \
+              2> "$diagnostics_dir/attachments.stderr.txt"; then
+            printf '%s\n' 'attachments: exported' \
+              >> "$diagnostics_dir/export-status.txt"
+          else
+            printf '%s\n' \
+              'attachments: export failed; see attachments.stderr.txt' \
+              >> "$diagnostics_dir/export-status.txt"
+          fi
+
+          if [[ -f "$attachments_dir/manifest.json" ]]; then
+            jq -r '
+              (
+                [
+                  .. | objects
+                  | select(.exportedFileName? != null)
+                  | [
+                      (.suggestedHumanReadableName? // "attachment"),
+                      .exportedFileName
+                    ]
+                ]
+                | unique_by(.[1])
+              ) as $rows
+              | (["name", "file"] | @tsv),
+                ($rows[] | @tsv)
+            ' "$attachments_dir/manifest.json" \
+              > "$diagnostics_dir/attachments.tsv"
+          fi
+
+          exit 0
+
+      - name: Export failed iPhone UI test diagnostics
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          result_bundle="$RUNNER_TEMP/NotesIPhoneUITests.xcresult"
+          diagnostics_dir="$RUNNER_TEMP/NotesIPhoneUITestDiagnostics"
+          attachments_dir="$diagnostics_dir/attachments"
+
+          mkdir -p "$diagnostics_dir"
+
+          if [[ ! -d "$result_bundle" ]]; then
+            printf '%s\n' \
+              'NotesIPhoneUITests.xcresult was not produced; no iPhone UI diagnostics can be exported.' \
+              > "$diagnostics_dir/export-status.txt"
+            exit 0
+          fi
+
+          : > "$diagnostics_dir/export-status.txt"
+
+          if xcrun xcresulttool get test-results summary \
+              --path "$result_bundle" \
+              > "$diagnostics_dir/test-summary.json" \
+              2> "$diagnostics_dir/test-summary.stderr.txt"; then
+            printf '%s\n' 'test summary: exported' \
+              >> "$diagnostics_dir/export-status.txt"
+          else
+            printf '%s\n' \
+              'test summary: export failed; see test-summary.stderr.txt' \
+              >> "$diagnostics_dir/export-status.txt"
+          fi
+
+          mkdir -p "$attachments_dir"
+
+          if xcrun xcresulttool export attachments \
+              --path "$result_bundle" \
+              --output-path "$attachments_dir" \
+              2> "$diagnostics_dir/attachments.stderr.txt"; then
+            printf '%s\n' 'attachments: exported' \
+              >> "$diagnostics_dir/export-status.txt"
+          else
+            printf '%s\n' \
+              'attachments: export failed; see attachments.stderr.txt' \
+              >> "$diagnostics_dir/export-status.txt"
+          fi
+
+          if [[ -f "$attachments_dir/manifest.json" ]]; then
+            jq -r '
+              (
+                [
+                  .. | objects
+                  | select(.exportedFileName? != null)
+                  | [
+                      (.suggestedHumanReadableName? // "attachment"),
+                      .exportedFileName
+                    ]
+                ]
+                | unique_by(.[1])
+              ) as $rows
+              | (["name", "file"] | @tsv),
+                ($rows[] | @tsv)
+            ' "$attachments_dir/manifest.json" \
+              > "$diagnostics_dir/attachments.tsv"
+          fi
+
+          exit 0
+
+      - name: Upload failed test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Notes-test-diagnostics
+          path: |
+            ${{ runner.temp }}/NotesUnitTests.xcresult
+            ${{ runner.temp }}/NotesUITests.xcresult
+            ${{ runner.temp }}/NotesIPhoneUITests.xcresult
+            ${{ runner.temp }}/NotesUITestDiagnostics
+            ${{ runner.temp }}/NotesIPhoneUITestDiagnostics
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Build unsigned app for a generic iPad
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Notes.xcodeproj \
+            -scheme Notes \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/NotesDerivedDataDevice" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            build
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="$RUNNER_TEMP/NotesDerivedDataDevice/Build/Products/Release-iphoneos/Notes.app"
+          if [[ ! -d "$app_path" ]]; then
+            echo "Expected app bundle was not produced at $app_path" >&2
+            exit 1
+          fi
+          package_root="$RUNNER_TEMP/NotesUnsignedPackage"
+          artifact_root="$RUNNER_TEMP/NotesUnsignedArtifact"
+          test ! -e "$package_root"
+          test ! -e "$artifact_root"
+          mkdir -p "$package_root/Payload" "$artifact_root"
+          ditto "$app_path" "$package_root/Payload/Notes.app"
+          plutil -convert xml1 "$package_root/Payload/Notes.app/Info.plist"
+          (cd "$package_root" && zip -qry "$artifact_root/Notes-unsigned.ipa" Payload)
+
+      - name: Generate unsigned IPA install manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          readonly workflow_path='.github/workflows/ios-ci.yml'
+          readonly artifact_name='Notes-unsigned-ipa'
+          readonly ipa_file='Notes-unsigned.ipa'
+          readonly app_bundle_directory='Notes.app'
+          readonly expected_bundle_identifier='com.speci.localnotes'
+          readonly expected_display_name='NextStep'
+          artifact_root="$RUNNER_TEMP/NotesUnsignedArtifact"
+          ipa_path="$artifact_root/$ipa_file"
+          packaged_info_plist="$RUNNER_TEMP/NotesUnsignedPackage/Payload/$app_bundle_directory/Info.plist"
+          manifest_path="$artifact_root/install-manifest.json"
+          manifest_temporary="$artifact_root/.install-manifest.json.tmp"
+
+          [[ "$GITHUB_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+          [[ "$GITHUB_REPOSITORY_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$BUILD_COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(git rev-parse HEAD)" == "$BUILD_COMMIT_SHA" ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GITHUB_WORKFLOW_REF" == "$GITHUB_REPOSITORY/$workflow_path@"* ]]
+          test -f "$ipa_path"
+          test -f "$packaged_info_plist"
+          test ! -e "$manifest_path"
+          test ! -e "$manifest_temporary"
+
+          bundle_identifier="$(plutil -extract CFBundleIdentifier raw -o - "$packaged_info_plist")"
+          bundle_display_name="$(plutil -extract CFBundleDisplayName raw -o - "$packaged_info_plist")"
+          [[ "$bundle_identifier" == "$expected_bundle_identifier" ]]
+          [[ "$bundle_display_name" == "$expected_display_name" ]]
+
+          ipa_sha256="$(shasum -a 256 "$ipa_path" | awk '{print $1}')"
+          ipa_size_bytes="$(stat -f '%z' "$ipa_path")"
+          [[ "$ipa_sha256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$ipa_size_bytes" =~ ^[1-9][0-9]*$ ]]
+
+          jq -nS \
+            --arg appBundleDirectory "$app_bundle_directory" \
+            --arg artifactName "$artifact_name" \
+            --arg bundleDisplayName "$bundle_display_name" \
+            --arg bundleIdentifier "$bundle_identifier" \
+            --arg commitSha "$BUILD_COMMIT_SHA" \
+            --arg format 'nextstep-unsigned-ipa' \
+            --arg ipaFile "$ipa_file" \
+            --arg ipaSha256 "$ipa_sha256" \
+            --argjson ipaSizeBytes "$ipa_size_bytes" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg repositoryId "$GITHUB_REPOSITORY_ID" \
+            --argjson runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --argjson schemaVersion 1 \
+            --arg workflowPath "$workflow_path" \
+            '{
+              appBundleDirectory: $appBundleDirectory,
+              artifactName: $artifactName,
+              bundleDisplayName: $bundleDisplayName,
+              bundleIdentifier: $bundleIdentifier,
+              commitSha: $commitSha,
+              format: $format,
+              ipaFile: $ipaFile,
+              ipaSha256: $ipaSha256,
+              ipaSizeBytes: $ipaSizeBytes,
+              repository: $repository,
+              repositoryId: $repositoryId,
+              runAttempt: $runAttempt,
+              runId: $runId,
+              schemaVersion: $schemaVersion,
+              workflowPath: $workflowPath
+            }' > "$manifest_temporary"
+          mv "$manifest_temporary" "$manifest_path"
+
+          jq -e \
+            --arg appBundleDirectory "$app_bundle_directory" \
+            --arg artifactName "$artifact_name" \
+            --arg bundleDisplayName "$bundle_display_name" \
+            --arg bundleIdentifier "$bundle_identifier" \
+            --arg commitSha "$BUILD_COMMIT_SHA" \
+            --arg ipaFile "$ipa_file" \
+            --arg ipaSha256 "$ipa_sha256" \
+            --argjson ipaSizeBytes "$ipa_size_bytes" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg repositoryId "$GITHUB_REPOSITORY_ID" \
+            --argjson runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg workflowPath "$workflow_path" \
+            'keys == [
+                "appBundleDirectory", "artifactName", "bundleDisplayName",
+                "bundleIdentifier", "commitSha", "format", "ipaFile",
+                "ipaSha256", "ipaSizeBytes", "repository", "repositoryId",
+                "runAttempt", "runId", "schemaVersion", "workflowPath"
+              ] and
+              .appBundleDirectory == $appBundleDirectory and
+              .artifactName == $artifactName and
+              .bundleDisplayName == $bundleDisplayName and
+              .bundleIdentifier == $bundleIdentifier and
+              .commitSha == $commitSha and
+              .format == "nextstep-unsigned-ipa" and
+              .ipaFile == $ipaFile and
+              .ipaSha256 == $ipaSha256 and
+              .ipaSizeBytes == $ipaSizeBytes and
+              .repository == $repository and
+              .repositoryId == $repositoryId and
+              .runAttempt == $runAttempt and
+              .runId == $runId and
+              .schemaVersion == 1 and
+              .workflowPath == $workflowPath' \
+            "$manifest_path" > /dev/null
+
+          [[ "$(shasum -a 256 "$ipa_path" | awk '{print $1}')" == "$ipa_sha256" ]]
+          [[ "$(stat -f '%z' "$ipa_path")" == "$ipa_size_bytes" ]]
+          shopt -s dotglob nullglob
+          artifact_entries=("$artifact_root"/*)
+          [[ "${#artifact_entries[@]}" == '2' ]]
+          for artifact_entry in "${artifact_entries[@]}"; do
+            [[ -f "$artifact_entry" && ! -L "$artifact_entry" ]]
+          done
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Notes-unsigned-ipa
+          path: |
+            ${{ runner.temp }}/NotesUnsignedArtifact/Notes-unsigned.ipa
+            ${{ runner.temp }}/NotesUnsignedArtifact/install-manifest.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Upload NextStep iPad screenshots
+        if: env.NEXTSTEP_CAPTURE_FINAL_PREVIEWS == '1'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: NextStep-iPad-homepage
+          path: ${{ runner.temp }}/NextStepScreenshots/*.png
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Upload NextStep responsive previews
+        if: env.NEXTSTEP_CAPTURE_FINAL_PREVIEWS == '1'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: NextStep-responsive-previews
+          path: ${{ runner.temp }}/NextStepResponsiveScreenshots/*.png
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Upload native NextStep Beta previews
+        if: env.NEXTSTEP_CAPTURE_FINAL_PREVIEWS == '1'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: NextStep-beta-native-previews
+          path: ${{ runner.temp }}/NextStepBetaScreenshots/*.png
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

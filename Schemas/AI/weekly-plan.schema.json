@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/weekly-plan-v1.json",
+  "title": "NextStep Weekly Plan Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "proposalID", "inputSnapshotSHA256", "engineVersion", "weekStartLocalDate", "timeZone", "capacityMinutes", "reservedBufferMinutes", "outcomes", "actionIDsByDate", "risks", "requiresUserConfirmation"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "proposalID": { "$ref": "#/$defs/uuid" },
+    "inputSnapshotSHA256": { "$ref": "#/$defs/sha256" },
+    "engineVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "weekStartLocalDate": { "type": "string", "format": "date" },
+    "timeZone": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "capacityMinutes": { "type": "integer", "minimum": 0, "maximum": 10080 },
+    "reservedBufferMinutes": { "type": "integer", "minimum": 0, "maximum": 10080 },
+    "outcomes": {
+      "type": "array", "maxItems": 100,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["weeklyOutcomeID", "milestoneID", "plannedMinutes", "actionIDs"],
+        "properties": {
+          "weeklyOutcomeID": { "$ref": "#/$defs/uuid" },
+          "milestoneID": { "$ref": "#/$defs/uuid" },
+          "plannedMinutes": { "type": "integer", "minimum": 0, "maximum": 10080 },
+          "actionIDs": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } }
+        }
+      }
+    },
+    "actionIDsByDate": {
+      "type": "array", "maxItems": 7,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["localDate", "mustActionIDs", "shouldActionIDs"],
+        "properties": {
+          "localDate": { "type": "string", "format": "date" },
+          "mustActionIDs": { "type": "array", "maxItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+          "shouldActionIDs": { "type": "array", "maxItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } }
+        }
+      }
+    },
+    "risks": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/risk" } },
+    "requiresUserConfirmation": { "type": "boolean" }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "risk": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "severity", "entityIDs", "explanation"],
+      "properties": {
+        "code": { "enum": ["infeasibleCapacity", "deadlineAtRisk", "missingDependency", "missingSource", "overload", "conflict"] },
+        "severity": { "enum": ["info", "warning", "blocking"] },
+        "entityIDs": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+        "explanation": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    }
+  }
+}

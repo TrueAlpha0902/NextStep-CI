@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/highlight-v1.json",
+  "title": "NextStep Highlight Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "highlightID", "sourceDocumentID", "anchorID", "sourceRevision", "originalText", "category", "explanation", "learningObjectiveIDs", "evidenceLinkIDs", "confidence", "requiresReview"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "highlightID": { "$ref": "#/$defs/uuid" },
+    "sourceDocumentID": { "$ref": "#/$defs/uuid" },
+    "anchorID": { "$ref": "#/$defs/uuid" },
+    "sourceRevision": { "type": "integer", "minimum": 0 },
+    "originalText": { "type": "string", "minLength": 1, "maxLength": 10000 },
+    "category": { "enum": ["coreConclusion", "definitionFormulaMethodData", "caseApplication", "limitationRiskControversy", "knowledgeGoalLink"] },
+    "explanation": { "type": "string", "minLength": 1, "maxLength": 3000 },
+    "learningObjectiveIDs": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "evidenceLinkIDs": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "requiresReview": { "type": "boolean" }
+  },
+  "$defs": { "uuid": { "type": "string", "format": "uuid" } }
+}

@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "只有在你選擇為筆記錄製音訊時，NextStep 才會使用麥克風。";
+"NSSpeechRecognitionUsageDescription" = "只有在你選擇建立逐字稿時，NextStep 才會使用裝置端語音辨識。";

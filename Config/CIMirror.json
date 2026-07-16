@@ -1,0 +1,9 @@
+{
+  "format": "nextstep-public-ci-mirror",
+  "version": 1,
+  "sourceRepository": "TrueAlpha0902/Notes",
+  "mirrorRepository": "TrueAlpha0902/NextStep-CI",
+  "mirrorBranch": "main",
+  "historyPolicy": "single-root-snapshot",
+  "licensePolicy": "all-rights-reserved"
+}

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="NextStep local contract preview for iPhone and iPad layouts.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>NextStep — Contract Preview</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#preview-content">跳到主要內容</a>
+
+  <header class="preview-toolbar" aria-label="預覽控制列">
+    <div class="preview-identity">
+      <span class="preview-kicker">NEXTSTEP / LOCAL TWIN</span>
+      <strong>Contract preview — not the iOS app</strong>
+      <span class="preview-detail">這是 Windows 可操作的介面合約預覽，不是 Apple Simulator。</span>
+    </div>
+
+    <div class="preview-controls">
+      <fieldset class="segmented-control" aria-label="預覽裝置">
+        <legend class="visually-hidden">預覽裝置</legend>
+        <button type="button" data-layout="auto" aria-pressed="true">自動</button>
+        <button type="button" data-layout="phone" aria-pressed="false">iPhone</button>
+        <button type="button" data-layout="tablet" aria-pressed="false">iPad</button>
+      </fieldset>
+      <button type="button" class="icon-button theme-toggle" id="theme-toggle" aria-label="切換深色模式" title="切換深色模式">
+        <span aria-hidden="true">◐</span>
+        <span class="control-label">明暗</span>
+      </button>
+      <button type="button" class="quiet-button" id="reset-demo">重設示範</button>
+    </div>
+  </header>
+
+  <main class="preview-workbench">
+    <section class="device-stage auto" id="device-stage" aria-label="NextStep 裝置預覽">
+      <div class="device-label" aria-hidden="true">
+        <span id="device-name">Responsive auto</span>
+        <span class="dimension-mark" id="dimension-mark">依容器自動切換 compact / regular</span>
+      </div>
+
+      <div class="device-frame" id="device-frame">
+        <div class="app-shell">
+          <header class="app-topbar">
+            <button type="button" class="brand-button" data-route="today" aria-label="回到 Today">
+              <span class="brand-mark" aria-hidden="true">N</span>
+              <span>
+                <strong>NextStep</strong>
+                <small>今天，直接開始</small>
+              </span>
+            </button>
+
+            <div class="topbar-context" aria-live="polite">
+              <span class="eyebrow">目前焦點</span>
+              <strong id="route-title">Today</strong>
+            </div>
+
+            <div class="topbar-actions">
+              <span class="sync-status" title="此預覽不會連接雲端">
+                <span class="status-dot" aria-hidden="true"></span>
+                本機預覽
+              </span>
+              <button type="button" class="avatar-button" aria-label="開啟使用者選單（預覽未提供）">陳</button>
+            </div>
+          </header>
+
+          <aside class="app-sidebar" aria-label="主要導覽">
+            <nav class="side-nav">
+              <button type="button" data-route="today" aria-current="page">
+                <span class="nav-glyph" aria-hidden="true">01</span>
+                <span>Today</span>
+              </button>
+              <button type="button" data-route="goals">
+                <span class="nav-glyph" aria-hidden="true">02</span>
+                <span>目標</span>
+              </button>
+              <button type="button" data-route="paper">
+                <span class="nav-glyph" aria-hidden="true">03</span>
+                <span>來源</span>
+              </button>
+              <button type="button" data-route="workspace">
+                <span class="nav-glyph" aria-hidden="true">04</span>
+                <span>工作區</span>
+              </button>
+            </nav>
+
+            <div class="sidebar-note">
+              <span class="pencil-label">this week</span>
+              <strong>4 / 6 個成果</strong>
+              <div class="mini-progress" aria-label="本週進度 67%"><span style="width:67%"></span></div>
+              <small>照目前節奏，研究計畫仍在安全範圍。</small>
+            </div>
+          </aside>
+
+          <main class="app-content" id="preview-content" tabindex="-1"></main>
+
+          <nav class="bottom-nav" aria-label="手機主要導覽">
+            <button type="button" data-route="today" aria-current="page"><span aria-hidden="true">01</span>Today</button>
+            <button type="button" data-route="goals"><span aria-hidden="true">02</span>目標</button>
+            <button type="button" data-route="paper"><span aria-hidden="true">03</span>來源</button>
+            <button type="button" data-route="workspace"><span aria-hidden="true">04</span>工作區</button>
+          </nav>
+
+          <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="replan-dialog" id="replan-dialog" aria-labelledby="replan-title">
+    <form method="dialog">
+      <div class="dialog-heading">
+        <div>
+          <span class="eyebrow">Replanning proposal</span>
+          <h2 id="replan-title">今天時間不足</h2>
+        </div>
+        <button type="submit" class="icon-button dialog-close" value="cancel" aria-label="關閉">×</button>
+      </div>
+
+      <p class="dialog-intro">不改動明確截止日，只調整可彈性安排的行動。套用前可檢查每個變更。</p>
+
+      <fieldset class="time-options">
+        <legend>今天還有多少時間？</legend>
+        <label><input type="radio" name="available-time" value="10"> <span><strong>10 分鐘</strong><small>只保留最低必要產出</small></span></label>
+        <label><input type="radio" name="available-time" value="20" checked> <span><strong>20 分鐘</strong><small>完成核心閱讀與一個輸出</small></span></label>
+        <label><input type="radio" name="available-time" value="35"> <span><strong>35 分鐘</strong><small>保留原任務，縮短複習</small></span></label>
+      </fieldset>
+
+      <div class="proposal-block">
+        <div class="proposal-row">
+          <span>保留</span>
+          <strong>理解負債如何影響 WACC</strong>
+          <small id="proposal-duration">20 分鐘</small>
+        </div>
+        <div class="proposal-row muted">
+          <span>移到明天</span>
+          <strong>完成 3 題延伸練習</strong>
+          <small>Deadline 未變</small>
+        </div>
+        <div class="proposal-row immutable">
+          <span>不變</span>
+          <strong>研究方法作業截止</strong>
+          <small>7 月 18 日 · 已確認事實</small>
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="submit" class="quiet-button" value="cancel">維持原計畫</button>
+        <button type="button" class="primary-button" id="apply-replan">套用重新安排</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.mjs"></script>
+</body>
+</html>

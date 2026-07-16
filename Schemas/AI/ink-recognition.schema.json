@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/ink-recognition-v1.json",
+  "title": "NextStep Ink Recognition Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "inkDocumentID", "pageID", "sourceRevision", "sourceInkSHA256", "engine", "results", "taskCandidates", "warnings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "inkDocumentID": { "$ref": "#/$defs/uuid" },
+    "pageID": { "$ref": "#/$defs/uuid" },
+    "sourceRevision": { "type": "integer", "minimum": 0 },
+    "sourceInkSHA256": { "$ref": "#/$defs/sha256" },
+    "engine": {
+      "type": "object", "additionalProperties": false,
+      "required": ["identifier", "version", "executedOnDevice"],
+      "properties": {
+        "identifier": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "executedOnDevice": { "type": "boolean" }
+      }
+    },
+    "results": {
+      "type": "array", "maxItems": 10000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["resultID", "strokeIDs", "bounds", "text", "language", "confidence", "alternatives", "kind"],
+        "properties": {
+          "resultID": { "$ref": "#/$defs/uuid" },
+          "strokeIDs": { "type": "array", "minItems": 1, "maxItems": 10000, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+          "bounds": { "$ref": "#/$defs/rect" },
+          "text": { "type": "string", "minLength": 1, "maxLength": 10000 },
+          "language": { "type": "string", "minLength": 2, "maxLength": 35 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "alternatives": { "type": "array", "maxItems": 10, "items": { "type": "string", "minLength": 1, "maxLength": 10000 } },
+          "kind": { "enum": ["title", "body", "list", "number", "symbol", "formula", "table", "diagramLabel", "unknown"] }
+        }
+      }
+    },
+    "taskCandidates": {
+      "type": "array", "maxItems": 1000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["candidateID", "resultIDs", "classification", "confidence", "suggestedTitle", "suggestedDeadline", "relatedGoalID", "requiresUserConfirmation"],
+        "properties": {
+          "candidateID": { "$ref": "#/$defs/uuid" },
+          "resultIDs": { "type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+          "classification": { "enum": ["learningGap", "examCandidate", "professorEmphasis", "assignmentCandidate", "researchQuestion", "followUpAction"] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "suggestedTitle": { "type": "string", "minLength": 1, "maxLength": 300 },
+          "suggestedDeadline": { "type": ["string", "null"], "format": "date-time" },
+          "relatedGoalID": { "type": ["string", "null"], "format": "uuid" },
+          "requiresUserConfirmation": { "const": true }
+        }
+      }
+    },
+    "warnings": { "type": "array", "maxItems": 100, "items": { "type": "string", "minLength": 1, "maxLength": 500 } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "rect": {
+      "type": "object", "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "height": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

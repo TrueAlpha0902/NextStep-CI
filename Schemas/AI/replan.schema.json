@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextstep.local/schemas/ai/replan-v1.json",
+  "title": "NextStep Replanning Proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestID", "proposalID", "triggerEventID", "basePlanRevision", "inputSnapshotSHA256", "engineVersion", "patches", "riskBefore", "riskAfter", "protectedImpacts", "requiresUserConfirmation", "explanation"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "requestID": { "$ref": "#/$defs/uuid" },
+    "proposalID": { "$ref": "#/$defs/uuid" },
+    "triggerEventID": { "$ref": "#/$defs/uuid" },
+    "basePlanRevision": { "type": "integer", "minimum": 0 },
+    "inputSnapshotSHA256": { "$ref": "#/$defs/sha256" },
+    "engineVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "patches": {
+      "type": "array", "maxItems": 1000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["patchID", "kind", "actionID", "fromLocalDate", "toLocalDate", "newActionIDs", "reasonCodes", "protected"],
+        "properties": {
+          "patchID": { "$ref": "#/$defs/uuid" },
+          "kind": { "enum": ["add", "remove", "move", "split", "retain"] },
+          "actionID": { "type": ["string", "null"], "format": "uuid" },
+          "fromLocalDate": { "type": ["string", "null"], "format": "date" },
+          "toLocalDate": { "type": ["string", "null"], "format": "date" },
+          "newActionIDs": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+          "reasonCodes": { "type": "array", "minItems": 1, "maxItems": 10, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 100 } },
+          "protected": { "type": "boolean" }
+        }
+      }
+    },
+    "riskBefore": { "enum": ["none", "low", "medium", "high", "infeasible"] },
+    "riskAfter": { "enum": ["none", "low", "medium", "high", "infeasible"] },
+    "protectedImpacts": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/protectedImpact" } },
+    "requiresUserConfirmation": { "type": "boolean" },
+    "explanation": { "type": "string", "minLength": 1, "maxLength": 3000 }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "protectedImpact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["entityID", "field", "currentValueSummary", "proposedValueSummary", "authority"],
+      "properties": {
+        "entityID": { "$ref": "#/$defs/uuid" },
+        "field": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "currentValueSummary": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "proposedValueSummary": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "authority": { "enum": ["sourceVerified", "userConfirmed", "userCommitment", "locked"] }
+      }
+    }
+  }
+}
