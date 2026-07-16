@@ -1,0 +1,16 @@
+.oldmaid-stage .card-table{background:radial-gradient(circle at 50% 44%,#fbf0de,#edf0e4)}
+.hand-label{text-align:center;color:var(--muted);font-size:.72rem;font-weight:900}.turn-message{text-align:center;padding:9px}.turn-message h2{margin:8px 0 4px}.turn-message p{margin:0;color:var(--muted)}
+.maze-status{display:flex;justify-content:space-between;gap:8px;width:min(560px,100%);margin:12px 0;color:var(--muted);font-size:.76rem}.maze-status b{color:var(--ink)}
+.directions{display:grid;grid-template-columns:repeat(3,60px);gap:7px}.directions button{height:54px;border:1.4px dashed var(--line);border-radius:15px;background:#fffdf8;font-size:1.35rem}.directions .up{grid-column:2}.directions .left{grid-column:1}.directions .down{grid-column:2}.directions .right{grid-column:3}
+
+/* One-piece mascot framing */
+.brand svg,.solo-brand svg,.hero-art svg,.character-btn svg,.game-cover svg,.intro-art svg,.solo-intro-art svg,.player-card svg,.solo-versus svg,.result-card>svg{overflow:visible;filter:drop-shadow(0 4px 3px rgba(83,62,34,.09))}
+.hero-art svg{animation:none}
+
+@media(max-width:760px){
+  .mode-lab{grid-template-columns:1fr;padding:15px}.mode-tabs{grid-template-columns:1fr 1fr}.mode-tabs button{min-width:0}.difficulty-wrap{padding-left:0;padding-top:12px;border-left:0;border-top:1px dashed var(--line)}
+  .solo-intro{grid-template-columns:115px 1fr}.solo-intro-art{min-height:260px}.solo-intro-art svg{width:110px}.solo-intro-copy{padding:17px}.solo-intro-copy h1{font-size:1.9rem}.solo-versus svg{width:90px;height:115px}
+}
+@media(max-width:430px){
+  .difficulty-grid{gap:4px}.difficulty-btn{padding:9px 4px}.difficulty-btn small{font-size:.55rem}.solo-versus{gap:4px}.solo-versus svg{width:76px;height:100px}.maze-status{font-size:.65rem}
+}
