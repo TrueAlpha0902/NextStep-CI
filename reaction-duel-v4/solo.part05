@@ -1,0 +1,35 @@
+  function drawSoloMaze(){var canvas=document.getElementById('soloMazeCanvas');if(!canvas||!solo)return;var ctx=canvas.getContext('2d'),b=solo.current.board,cw=canvas.width/b.width,ch=canvas.height/b.height;ctx.fillStyle='#fffdf8';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#6d5d4b';ctx.lineWidth=5;b.cells.forEach(function(bits,i){var x=i%b.width*cw,y=Math.floor(i/b.width)*ch;ctx.beginPath();if(!(bits&1)){ctx.moveTo(x,y);ctx.lineTo(x+cw,y);}if(!(bits&2)){ctx.moveTo(x+cw,y);ctx.lineTo(x+cw,y+ch);}if(!(bits&4)){ctx.moveTo(x,y+ch);ctx.lineTo(x+cw,y+ch);}if(!(bits&8)){ctx.moveTo(x,y);ctx.lineTo(x,y+ch);}ctx.stroke();});var gx=b.goal%b.width*cw+cw/2,gy=Math.floor(b.goal/b.width)*ch+ch/2;ctx.fillStyle='#D4A55F';ctx.beginPath();ctx.arc(gx,gy,cw*.24,0,Math.PI*2);ctx.fill();}
+
+  function finishRound(winner,title,text,playerStat,cpuStat,playerAdd,cpuAdd){clearTimers();if(winner==='player')solo.scores.player+=playerAdd||1;else if(winner==='cpu')solo.scores.cpu+=cpuAdd||1;else{solo.scores.player+=playerAdd||1;solo.scores.cpu+=cpuAdd||1;}solo.result={winner:winner,title:title,text:text,playerStat:playerStat,cpuStat:cpuStat};solo.phase='round_result';vibrate(winner==='player'?[18,30,18]:winner==='cpu'?[45,30,45]:20);renderSolo();}
+  function finishInstantMatch(winner,title,text){clearTimers();solo.scores[winner]=1;solo.result={winner:winner,title:title,text:text,playerStat:winner==='player'?'勝利':'落敗',cpuStat:winner==='cpu'?'勝利':'落敗'};solo.phase='round_result';solo.round=solo.maxRounds;renderSolo();}
+  function showMatch(){solo.phase='match_result';renderSolo();}
+
+  function bindPointSurface(surface,marker,state){if(!surface)return;var dragging=false;function set(e){var p=e.touches&&e.touches[0]?e.touches[0]:e,r=surface.getBoundingClientRect();state.x=clamp((p.clientX-r.left)/r.width*2-1,-1,1);state.y=clamp((p.clientY-r.top)/r.height*2-1,-1,1);marker.style.left=(state.x+1)*50+'%';marker.style.top=(state.y+1)*50+'%';e.preventDefault();}surface.addEventListener('pointerdown',function(e){dragging=true;set(e);});surface.addEventListener('pointermove',function(e){if(dragging)set(e);});surface.addEventListener('pointerup',function(){dragging=false;});surface.addEventListener('pointercancel',function(){dragging=false;});}
+
+  function bindSolo() {
+    var exit=document.getElementById('soloExit');if(exit)exit.onclick=exitSolo;
+    if(solo.phase==='intro'){
+      var levels=document.querySelectorAll('[data-difficulty]');for(var i=0;i<levels.length;i++)levels[i].onclick=function(){difficulty=this.getAttribute('data-difficulty');store(DIFF_KEY,difficulty);renderSolo();};
+      document.getElementById('soloReady').onclick=beginCountdown;return;
+    }
+    if(solo.phase==='playing'){
+      if(isReaction(solo.gameId)){
+        var surface=document.getElementById('soloTapSurface');surface.onpointerdown=function(e){e.preventDefault();var c=solo.current;if(c.sent||c.resolved)return;c.sent=true;if(!c.live||!c.shownAt){c.early=true;c.playerMs=-1;vibrate([45,25,45]);renderSolo();addTimer(setTimeout(function(){finishReaction(-1);},350));}else{c.playerMs=Math.round(performance.now()-c.shownAt);vibrate(18);renderSolo();addTimer(setTimeout(function(){finishReaction(c.playerMs);},350));}};
+      }else if(solo.gameId==='archery'){
+        bindPointSurface(document.getElementById('soloTarget'),document.getElementById('soloCross'),solo.current.aim);document.getElementById('soloShoot').onclick=shootArchery;
+      }else if(solo.gameId==='marbles'){
+        bindPointSurface(document.getElementById('soloMarble'),document.getElementById('soloMarbleAim'),solo.current.aim);var range=document.getElementById('soloPower'),read=document.getElementById('soloPowerValue');range.oninput=function(){solo.current.power=Number(range.value)/100;read.textContent=range.value+'%';};document.getElementById('soloShoot').onclick=shootMarbles;
+      }else if(solo.gameId==='tower'){
+        if(solo.current.turn==='player'){var block=document.getElementById('soloMoving'),start=performance.now();function move(t){var p=((t-start)%2300)/2300,q=p<.5?p*2:2-p*2;solo.current.movingX=-.74+q*1.48;if(block)block.style.left=(50+solo.current.movingX*44)+'%';animationFrame=requestAnimationFrame(move);}animationFrame=requestAnimationFrame(move);document.getElementById('soloPlace').onpointerdown=function(){cancelAnimationFrame(animationFrame);towerPlace('player',solo.current.movingX);};}
+      }else if(solo.gameId==='oldmaid'){
+        var cards=document.querySelectorAll('[data-solo-draw]');for(var j=0;j<cards.length;j++)cards[j].onclick=function(){drawMaid('player',Number(this.getAttribute('data-solo-draw')));};
+      }else{
+        drawSoloMaze();var dirs=document.querySelectorAll('[data-solo-move]');for(var k=0;k<dirs.length;k++)dirs[k].onclick=function(){movePlayerMaze(this.getAttribute('data-solo-move'));};
+      }
+    }else if(solo.phase==='round_result'){
+      document.getElementById('soloNext').onclick=function(){if(solo.round>=solo.maxRounds)showMatch();else{solo.round++;beginGame();}};
+    }else if(solo.phase==='match_result'){
+      document.getElementById('soloAgain').onclick=function(){var id=solo.gameId;startSolo(id);};document.getElementById('soloHome').onclick=exitSolo;
+    }
+  }
+})();
