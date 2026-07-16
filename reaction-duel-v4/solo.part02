@@ -1,0 +1,76 @@
+      '<section class="card solo-versus"><div>' + ART.giraffe(solo.player.character, 'ready') + '<b>' + esc(solo.player.name) + '</b><small>玩家</small></div><em>VS</em><div>' + ART.giraffe(solo.cpu.character, 'think') + '<b>' + solo.cpu.name + '</b><small>' + LEVELS[difficulty].label + '強度</small></div></section>' +
+      '<section class="card solo-settings"><p class="kicker">COMPUTER LEVEL</p><h2>調整電腦強度</h2>' + difficultyButtons(false) + '<p class="solo-level-note">強度會調整電腦的反應時間、瞄準誤差、疊塔穩定度與迷宮速度。</p><button type="button" class="btn primary wide" id="soloReady">我準備好了</button></section>');
+  }
+
+  function countdownView() {
+    return soloShell('<section class="solo-count"><div class="card countdown-card">' + ART.giraffe(solo.player.character, 'ready') + '<p class="kicker">' + game(solo.gameId).title + '</p><div class="count-number" id="soloCount">3</div><h2>準備開始</h2><p>3、2、1 之後正式進入遊戲</p></div></section>');
+  }
+
+  function gameHeader() {
+    return '<div class="game-head"><div><small>' + (solo.maxRounds > 1 ? ('第 ' + solo.round + ' / ' + solo.maxRounds + ' 回合') : '一局決勝') + '</small><h1>' + game(solo.gameId).title + '</h1></div><div class="scoreboard"><span>你 <b>' + solo.scores.player + '</b></span><span>:</span><span><b>' + solo.scores.cpu + '</b> 電腦</span></div></div>';
+  }
+
+  function reactionPrompt(id) {
+    if (id === 'color') {
+      var colors = [
+        { label:'鼠尾草綠', value:'#8F9B79' }, { label:'暖赭黃', value:'#D4A55F' },
+        { label:'乾燥玫瑰', value:'#C99083' }, { label:'霧藍', value:'#8DA6AF' }
+      ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+    if (id === 'number') {
+      var target = 1 + Math.floor(Math.random() * 9), decoy = 1 + Math.floor(Math.random() * 9);
+      if (decoy === target) decoy = target === 9 ? 1 : target + 1;
+      return { target: target, decoy: decoy };
+    }
+    var values = id === 'shape' ? ['●','▲','■','★'] : ['♟','❧','☾','♠'];
+    var t = values[Math.floor(Math.random() * values.length)], d = values[Math.floor(Math.random() * values.length)];
+    if (d === t) d = values[(values.indexOf(t) + 1) % values.length];
+    return { target:t, decoy:d };
+  }
+
+  function reactionGameView() {
+    var c = solo.current;
+    var p = c.prompt;
+    var targetLabel, object;
+    if (solo.gameId === 'color') {
+      targetLabel = '目標顏色：' + p.label;
+      object = '<div class="signal-object orb" style="--signal:' + p.value + '"></div>';
+    } else {
+      targetLabel = '目標：' + p.target;
+      object = '<div class="signal-object tile">' + (c.live ? p.target : p.decoy) + '</div>';
+    }
+    var cls = c.early ? ' early' : (c.live ? ' live' : '');
+    var text = c.sent ? (c.early ? '太早按了・本回合失誤' : ('已按下・' + c.playerMs + ' ms')) : '看到目標，碰觸整個反應區';
+    return soloShell(gameHeader() + '<section class="card stage reaction-stage solo-tap-surface' + cls + '" id="soloTapSurface"><div class="target-label">' + targetLabel + '</div>' + object + '<h2>' + (c.sent ? (c.early ? '提早出手' : '點擊已收到') : (c.live ? '就是現在！' : '保持專注')) + '</h2><p>' + (c.sent ? '正在和電腦比較結果。' : (c.live ? '整張卡片都可以點擊。' : '訊號尚未出現，現在不要按。')) + '</p><div class="tap-zone ' + (c.sent ? 'locked' : '') + '">' + text + '</div><div class="feedback-row"><span class="feedback-chip">電腦強度：' + LEVELS[difficulty].label + '</span>' + (c.sent ? '<span class="feedback-chip ' + (c.early ? 'bad' : 'good') + '">' + (c.early ? '提前點擊' : c.playerMs + ' ms') + '</span>' : '') + '</div></section><div class="note">本機使用 performance.now() 計算。電腦本回合反應時間會先產生，避免依網路速度決定勝負。</div>');
+  }
+
+  function pointBoardView(type) {
+    var c = solo.current;
+    if (type === 'archery') {
+      var angle = Math.atan2(c.windY, c.windX) * 180 / Math.PI;
+      return soloShell(gameHeader() + '<section class="card stage skill-stage"><div class="archery-wrap"><div class="target-board" id="soloTarget"><div class="crosshair" id="soloCross" style="left:' + ((c.aim.x + 1) * 50) + '%;top:' + ((c.aim.y + 1) * 50) + '%"><i></i></div></div></div><div class="skill-side"><p class="kicker">AIM WITH WIND</p><h2>瞄準靶心</h2><div class="wind-card"><div class="wind-arrow" style="transform:rotate(' + angle + 'deg)">➜</div><div><b>觀察風向</b><small>箭會往箭頭方向偏移</small></div></div><p>拖曳靶面移動準星。放箭後會立即和電腦比較。</p><button type="button" class="btn primary wide" id="soloShoot">確認準星並放箭</button>' + ART.giraffe(solo.player.character, 'aim') + '</div></section>');
+    }
+    return soloShell(gameHeader() + '<section class="card stage skill-stage"><div class="archery-wrap"><div class="marble-board" id="soloMarble"><i class="marble p1" style="left:9%;top:81%"></i><i class="marble p2" style="left:91%;top:81%"></i><i class="marble aim" id="soloMarbleAim" style="left:' + ((c.aim.x + 1) * 50) + '%;top:' + ((c.aim.y + 1) * 50) + '%"></i></div></div><div class="skill-side"><p class="kicker">AIM & POWER</p><h2>設定落點與力道</h2><p>點擊圓盤決定方向，再調整力道。</p><div class="power-row"><input id="soloPower" type="range" min="20" max="100" value="' + Math.round(c.power * 100) + '"><div class="power-readout"><span>輕</span><b id="soloPowerValue">' + Math.round(c.power * 100) + '%</b><span>重</span></div></div><button type="button" class="btn primary wide" id="soloShoot">發射彈珠</button></div></section>');
+  }
+
+  function towerView() {
+    var t = solo.current;
+    var blocks = '';
+    for (var i = 0; i < t.blocks.length; i++) {
+      var b = t.blocks[i], cls = i % 3 === 1 ? ' sage' : (i % 3 === 2 ? ' rose' : '');
+      blocks += '<i class="tower-block' + cls + '" style="width:' + (b.width * 88) + '%;left:' + (50 + b.x * 44) + '%;bottom:' + (i * 32) + 'px"></i>';
+    }
+    if (t.turn === 'player') blocks += '<i class="tower-block tower-moving" id="soloMoving" style="width:' + (t.blocks[t.blocks.length - 1].width * 88) + '%"></i>';
+    return soloShell(gameHeader() + '<section class="card stage"><div class="tower-world"><div class="tower-level">目前 ' + (t.blocks.length - 1) + ' / 12 層</div><div class="tower-stack">' + blocks + '</div><div class="tower-action">' + (t.turn === 'player' ? '<button type="button" class="btn primary wide pulse" id="soloPlace">碰觸放下積木</button>' : '<div class="waiting-box">電腦正在判斷位置…</div>') + '</div></div></section><div class="note">電腦強度越高，放置誤差越小。完全沒有重疊的一方會倒塔落敗。</div>');
+  }
+
+  function oldMaidView() {
+    var m = solo.current;
+    var backs = '';
+    for (var i = 0; i < m.cpu.length; i++) backs += '<button type="button" class="playing-card back" data-solo-draw="' + i + '" ' + (m.turn === 'player' ? '' : 'disabled') + '></button>';
+    var own = '';
+    for (var j = 0; j < m.player.length; j++) {
+      var card = m.player[j];
+      own += '<div class="playing-card"><span class="rank">' + (card.value === 99 ? '鬼' : card.value) + '</span><div class="face">' + (card.value === 99 ? '<span style="font-size:3rem">👻</span>' : ART.giraffe((card.value % 5) + 1, 'cards')) + '</div></div>';
+    }
